@@ -11,6 +11,9 @@ import numpy as np
 # -----------------------------------------------------
 # STAND: 18.05.2018
 
+# TODO: Geschwindigkeitsoptimierungen:
+#  - len(np.array) ist langsamer als np.array.size bei 1-D arrays
+
 class InitModel:
 
     def __init__(self, G, C, S):
@@ -88,6 +91,11 @@ class InitModel:
         # G = Bildvektor
         # C = Gemessene Kapazitäten
         # ga2 = normalisierte Konstante 0 <= ga2 <= 1
+        #
+        # Anmerkungen:
+        #  - Warum ist C in self, aber G nicht? Müsste C nicht auch extern sein?
+        #    Immerhin ändert sich C wie G mit jeder Messung, während S statisch
+        #    ist.
         err = np.zeros((len(G),len(G)))
         errsq = np.zeros((len(G), len(G)))
         for i in range(len(G)):
@@ -96,6 +104,21 @@ class InitModel:
             errsq += err ** 2
         f2 = 0.5 * self.gam[1] * errsq
         return f2
+        # Alternative Implementierung von Spratte:
+        #   Datentyp abhängig:
+        #     self.S : np.array
+        #     self.C : np.array
+        #     G      : np.array
+        # entweder (bei kleinen Arrays schneller)
+        f2 = .5 * self.gam[1] * np.sum(np.square(self.S.dot(G) - self.C))
+        # oder (bei großen Arrays schneller)
+        f2 = .5 * self.gam[1] * np.sum(np.square(self.S @ G - self.C))
+        #   Matrix soll overhead haben gegenüber array
+        #   (https://stackoverflow.com/a/3892639/6783373) -> array ist besser
+        #     self.S : np.matrix
+        #     self.C : np.matrix
+        #     G      : np.matrix
+        # f2 = .5 * self.gam[1] * np.sum(np.square(self.S * G - C))
 
     # Objektfunktion f3 nach S. 2203 (16)
     def func3 (self, G):  # sum of the non-uniformity and peakedness functions of an image (16) - minimiert um locale
@@ -111,6 +134,27 @@ class InitModel:
         #       x1, x2, x3 == smoothing weights == (1, -1/8, -1/8) für die Standard-Smoothing Matrix
         f3 = 0.5 * self.gam[2] * (np.dot(np.dot(G.T, self.X), G) + np.dot(G.T,G))
         return f3
+
+    # Spratte: Lösung für Berechnung der smoothMat (S.2202):
+    # Unterstellt: Rechteckiges Bild mit Breite self.G_width, G[0] in linker
+    # oberer Ecke, G[1] der zweite Pixel von links in der obersten Reihe
+    #def smoothMat(self):
+        #X = np.array(
+                #[ [ neighbours(i,j) for i in range(self.G.size) ]
+                    #for j in range(self.G.size) ] )
+    #def neighbours(self,i,j):
+        #x1 = 1
+        #if i == j: return x1
+        #x2 = -1/8
+        #x3 = -1/8
+        #i_row = i // self.G_width # Python 3 Syntax für Integerdivision
+        #i_col = i %  self.G_width
+        #j_row = j // self.G_width # Python 3 Syntax für Integerdivision
+        #j_col = j %  self.G_width
+        #if i_row == j_row          and abs(i_col - j_col) == 1 : return x2
+        #if abs(i_row - j_row) == 1 and i_col == j_col          : return x2
+        #if abs(i_row - j_row) == 1 and abs(i_col - j_col) == 1 : return x3
+        #return 0
 
     # Smoothing Matrix (S. 2202)
     def smoothMat(self):
@@ -208,6 +252,25 @@ class InitModel:
         _, self.G = self.delta()
 
     # Aktivierungsfunktion nach S.2204 (23)
+    # Spratte: Ich glaube, das Paper hat hier einen Fehler (bzw. es fehlt
+    # Information). Der Sinn einer Aktivierungsfunktion ist doch, den Wert
+    # zwischen 0 und 1 zu halten. Die angegebene Funktion tut dies aber nicht.
+    # Ich glaube es müsste heißen:
+    #
+    #               / 0               if      beta u_j + xi <= 0
+    #     f(u_j) = <  beta u_j + xi   if 0 <  beta u_j + xi < 1
+    #               \ 1               if 1 <= beta u_j + xi
+    #
+    # Das stimmt mit der Definition aus dem Paper überein, solange b und x in
+    # einem bestimmten Intervall liegen
+    # Sollte meine Vermutung richtig sein, ist folgende Implementierung ein
+    # bisschen schneller:
+    #def activation(self, u):
+        #v = self.beta * u + self.xi
+        #for j in range(len(v)):
+            #if v[j] < 0: v[j] = 0
+            #elif v[j] > 1: v[j] = 1
+        #return v
     def activation(self, u):
         v = np.zeros(len(u))
         for j in range(len(u)):

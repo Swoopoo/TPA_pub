@@ -14,32 +14,37 @@ import numpy as np
 # TODO: Geschwindigkeitsoptimierungen:
 #  - len(np.array) ist langsamer als np.array.size bei 1-D arrays
 
+# STAND: 16.10.2018
+# TODO: Rest der Funktionen (23+) durchsehen ob passen
+
 class InitModel:
 
-    def __init__(self, G, C, S):
-        self.t = 0
-        self.deltat = 0.01
-        self.tau = 1 # = R_0 C_0
-        self.alpha_0 = 7
-        self.beta = 2
-        self.xi = 5
-        self.gam = np.zeros(3)
-        self.u = np.zeros(len(G))
-        self.u_deltat = np.zeros(len(G))
-        self.v = self.activation(self.u)
-        self.G = G
-        self.G_deltat = np.zeros(len(G))
-        self.C = C
+    # TODO: Modelarchitektur ändern und anpassen, damit es bei einer Zeitkonstanten Messung nicht immer
+    # TODO: alles neu berechnet
+    def __init__(self, S, ImageSize):
+        self.t = 0 # Time
+        self.deltat = 0.01 # Algorithm Steplength
+        self.tau = 1 # = R_0 C_0 # Time Constant of the capacitors - set to 1.0 to measure in units \tau
+        self.alpha_0 = 7 # penalty Parameter
+        self.beta = 2 # Steepness gain factor - vertical slope and the horizontal spread of the sigmoid-shape function
+        self.xi = 5 # y-Axis intercept of the linear activation function
+        self.zeta = 1 # TODO: ??
+        self.gam = np.zeros(3) # Initialize Gamma_1,2,3 to zero
+        self.v = self.activation(self.u) # Initialize Node Outputs
+        self.G = np.zeros(ImageSize[0]*ImageSize[1]) # Initializing Image Vector
+        self.u = np.zeros(len(self.G)) # Init. of Network Input Vector
+        self.u_deltat = np.zeros(len(self.G)) #
+        self.G_deltat = np.zeros(len(self.G))
+        # self.C = C
         self.S = S
         self.z, self.deltaz = self.rel()
-        self.X = self.smoothMat()
-        self.XG = self.smoothie(G)
-        self.smoothing_weights = (1, -1/8, -1/8)
-        self.w = np.array([1/3, 1/3, 1/3])
+        self.smoothing_weights = (1, -1/8, -1/8) # Smoothing Weights for smoothing the Image vector
+        self.w = np.array([1/3, 1/3, 1/3]) # Initial Values vor omega_1,2,3
 
     # Differential von u nach S. 2205 (31)
     # Ist self.gam hier wirklich das gleiche wie in den anderen Funktionen? Im
     # Text steht auf S. 2204 das gamma = gamma / C_0 substituiert wird.
+    # TODO: Gamma is normalized on the Reference Capacity
     def derivu(self):
         u_deriv = -(self.u/self.tau) - (
                   self.w[0] * self.gam[0] * (1 + np.log(self.G))
@@ -53,14 +58,15 @@ class InitModel:
     def alpha(self, t):
         # Spratte: kleiner Fehler, der komische griechische Buchstabe ist ein
         # zeta: alpha_0, zeta, eta >= 0
-        #return self.alpha_0 + self.zeta * np.exp(-self.eta * t)
-        return self.alpha_0 + self.xi * np.exp(-t)
+        return self.alpha_0 + self.zeta * np.exp(-self.eta * t)
+
 
     # G(t+deltat) bzw. u(t+deltat) nach S. 2205 (36) bzw. (33)
     def delta(self):
         u_deltat = self.u + self.derivu() * self.deltat
         G_deltat = self.G + self.beta * self.derivu() * self.deltat
         return u_deltat, G_deltat
+
 
     # Zeitschritt machen
     def timestep(self):
@@ -167,6 +173,8 @@ class InitModel:
     # ich schreibe doch noch ein Modul in C.
     # Die Speichermenge wechst in 4ter Potenz mit der Bildbreite, bzw.
     # quadtratisch zur Pixelzahl, wobei ein 1x1 np.array 8 byte benötigt.
+    #
+    # TODO: Evtl. RAM Abfragen ob smoothMat2 benutzt werden kann
     #def smoothMat2(size,width):
         #X = np.zeros((size,size))
         #for i in range(size):
@@ -201,10 +209,12 @@ class InitModel:
     def smoothie(self, G):
         XG = self.smoothing_weights[0] * G.copy()
         for i in range(XG.size):
-            E, V = get_neighbours(i) # returns 2 lists of indices
+            E, V = self.get_neighbours(i) # returns 2 lists of indices
             XG[i] +=   self.smoothing_weights[1] * np.sum(G[E]) \
                      + self.smoothing_weigths[2] * np.sum(G[V])
         return XG
+
+
     def get_neighbours(self, i):
         E = []
         V = []
@@ -228,86 +238,11 @@ class InitModel:
             E.append(i + 1)
         return (E, V)
 
-    # Smoothing Matrix (S. 2202)
-    # Spratte: Habe einen kurzen Test gemacht und es scheint, deine Funktion
-    # schmeißt Errors um sich. Ich habe getestet mit:
-    #IssueCount = 0
-    #for i in range(201):
-        #try:
-            #X = smoothMat(i**2)
-        #except:
-            #print("Issue with", i)
-            #IssueCount += 1
-    #print("Issues in ",IssueCount," iterations")
-    # und nur für 4 (also smoothMat(16)) funktioniert die Funktion. Das Argument
-    # war in diesem Fall len(self.G) (in meiner Testumgebung habe ich
-    # dementsprechend alle Aufrufe ersetzt).
-    def smoothMat(self):
-        X = np.zeros((len(self.G), len(self.G)))
-        ind = np.array(range(0, len(self.G))).reshape(int(np.sqrt(len(self.G))), int(np.sqrt(len(self.G))))
-        x1, x2, x3 = 1, -1 / 8, -1 / 8
-        E = np.zeros((1, int(np.sqrt(len(self.G)))))
-        V = np.zeros((1, int(np.sqrt(len(self.G)))))
-
-        for i in range(int(np.sqrt(len(self.G)))):
-            for j in range(int(np.sqrt(len(self.G)))):
-                E_temp, V_temp = self.neighbours((i, j))
-                for k in range(len(E_temp)):
-                    # if
-                    if E_temp[k] is not np.NaN:
-                        E_temp[k] = ind[E_temp[k][0], E_temp[k][1]]
-                    if V_temp[k] is not np.NaN:
-                        V_temp[k] = ind[V_temp[k][0], V_temp[k][1]]
-                if E_temp.shape == (int(np.sqrt(len(self.G))), 2):
-                    E_temp = np.array([E_temp[k][0] for k in range(4)])
-                if V_temp.shape == (int(np.sqrt(len(self.G))), 2):
-                    V_temp = np.array([V_temp[k][0] for k in range(4)])
-                E = np.vstack((E, E_temp))
-                V = np.vstack((V, V_temp))
-        E = np.delete(E, 0, 0)
-        V = np.delete(V, 0, 0)
-        for j in range(X.shape[0]):
-            for k in range(X.shape[1]):
-                if k in E[j]:
-                    X[j, k] = x2
-                elif k in V[j]:
-                    X[j, k] = x3
-                else:
-                    X[j, k] = 0
-        np.fill_diagonal(X, x1)
-        return X
-
-    # Nachbar Indizes für Smoothing Matrix
-    def neighbours(self, a):
-        o, u, l, r = (a[0] - 1, a[1]), (a[0] + 1, a[1]), (a[0], a[1] - 1), (a[0], a[1] + 1)
-        lo, ro, lu, ru = (a[0] - 1, a[1] - 1), (a[0] - 1, a[1] + 1), (a[0] + 1, a[1] - 1), (
-            a[0] + 1, a[1] + 1)
-        E = np.stack((o, u, l, r), axis=0)
-        V = np.stack((lo, ro, lu, ru), axis=0)
-        b = []
-        for n in range(E.shape[0]):
-            if not all(0 <= k < int(np.sqrt(len(self.G))) for k in E[n, :]):
-                b.append(n)
-        # E = np.delete(E, (a), axis=0)
-        E = list(E)
-        for i in b:
-            E[i] = np.NaN
-
-        b = []
-        for n in range(V.shape[0]):
-            if not all(0 <= k < int(np.sqrt(len(self.G))) for k in V[n, :]):
-                b.append(n)
-        # V = np.delete(V, (a), axis=0)
-        V = list(V)
-        for i in b:
-            V[i] = np.NaN
-        return np.array(E, object), np.array(V, object)
-
     # Gamma-Konstanten für die Objektfunktionen nach S. 2206
     def calcGamma(self):
         gamsum = 0
-        for j in range(len(self.G)):
-            gamsum += self.G[j] * np.log(self.G[j])
+        gamsum = np.sum(np.dot(self.G, np.log(self.G)))
+
         self.gam[0] = 1 / gamsum
 
         self.gam[1] = 1 / (0.5 * np.abs(np.dot(self.S, self.G) - self.G))**2
@@ -350,22 +285,13 @@ class InitModel:
     # in einem bestimmten Intervall liegen (genauer: solange beta = 1).
     # Sollte meine Vermutung richtig sein, ist folgende Implementierung ein
     # bisschen schneller:
-    #def activation(self, u):
-        #v = self.beta * u + self.xi
-        #for j in range(len(v)):
-            #if v[j] < 0: v[j] = 0
-            #elif v[j] > 1: v[j] = 1
-        #return v
     def activation(self, u):
-        v = np.zeros(len(u))
-        for j in range(len(u)):
-            if u[j] <= -self.xi / self.beta:
-                v[j] = 0
-            elif u[j] >= 1 - (self.xi / self.beta):
-                v[j] = self.beta * u[j] + self.xi
-            else:
-                v[j] = 1
+        v = self.beta * u + self.xi
+        for j in range(len(v)):
+            if v[j] < 0: v[j] = 0
+            elif v[j] > 1: v[j] = 1
         return v
+
 
     # Fehlerfunktion nach S.2207
     def calcError(self):
@@ -376,6 +302,6 @@ class InitModel:
 # G und C als .shape = (bla,) Vektoren übergeben!
 x = InitModel(np.random.randint(1, 9, size=16)/100, np.random.randint(1, 9, size=12)/1000,
               np.random.randint(1, 4, size=(12, 16)))
-
-print(x.G)
-print(x.X)
+# TODO: Siehe ModelInit
+# m = InitModel(S, groesse)
+# blubb = m.calc_g(bla)

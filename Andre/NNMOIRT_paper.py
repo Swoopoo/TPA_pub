@@ -203,7 +203,7 @@ class InitModel:
         for i in range(XG.size):
             E, V = get_neighbours(i) # returns 2 lists of indices
             XG[i] +=   self.smoothing_weights[1] * np.sum(G[E]) \
-                     + self.smoothing_weigths[2] * np.sum(G[V])
+                     + self.smoothing_weights[2] * np.sum(G[V])
         return XG
     def get_neighbours(self, i):
         E = []

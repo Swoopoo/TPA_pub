@@ -9,26 +9,21 @@ import numpy as np
 # von W. Warsito und L-S Fan
 # -----------------------------------------------------
 # -----------------------------------------------------
-# STAND: 18.05.2018
-
-# TODO: Geschwindigkeitsoptimierungen:
-#  - len(np.array) ist langsamer als np.array.size bei 1-D arrays
-
+#
 # STAND: 16.10.2018
 # TODO: Rest der Funktionen (23+) durchsehen ob passen
 
 class InitModel:
 
-    # TODO: Modelarchitektur ändern und anpassen, damit es bei einer Zeitkonstanten Messung nicht immer
-    # TODO: alles neu berechnet
-    def __init__(self, S, ImageSize):
+    def __init__(self, S, ImageSize, deltat = 0.01, tau = 1, alpha_0 = 7, beta = 2, xi = 5, zeta = 1,
+                 smoothing_weights = (1, -1/8, -1/8), w = (1/3, 1/3, 1/3)):
         self.t = 0 # Time
-        self.deltat = 0.01 # Algorithm Steplength
-        self.tau = 1 # = R_0 C_0 # Time Constant of the capacitors - set to 1.0 to measure in units \tau
-        self.alpha_0 = 7 # penalty Parameter
-        self.beta = 2 # Steepness gain factor - vertical slope and the horizontal spread of the sigmoid-shape function
-        self.xi = 5 # y-Axis intercept of the linear activation function
-        self.zeta = 1 # TODO: ??
+        self.deltat = deltat # Algorithm Steplength
+        self.tau = tau# = R_0 C_0 # Time Constant of the capacitors - set to 1.0 to measure in units \tau
+        self.alpha_0 = alpha_0 # penalty Parameter
+        self.beta = beta # Steepness gain factor - vertical slope and the horizontal spread of the sigmoid-shape function
+        self.xi = xi # y-Axis intercept of the linear activation function
+        self.zeta = zeta # TODO: ??
         self.gam = np.zeros(3) # Initialize Gamma_1,2,3 to zero
         self.v = self.activation(self.u) # Initialize Node Outputs
         self.G = np.zeros(ImageSize[0]*ImageSize[1]) # Initializing Image Vector
@@ -38,13 +33,13 @@ class InitModel:
         # self.C = C
         self.S = S
         self.z, self.deltaz = self.rel()
-        self.smoothing_weights = (1, -1/8, -1/8) # Smoothing Weights for smoothing the Image vector
-        self.w = np.array([1/3, 1/3, 1/3]) # Initial Values vor omega_1,2,3
+        self.smoothing_weights = smoothing_weights# Smoothing Weights for smoothing the Image vector
+        self.w = np.array(w) # Initial Values vor omega_1,2,3
 
     # Differential von u nach S. 2205 (31)
     # Ist self.gam hier wirklich das gleiche wie in den anderen Funktionen? Im
     # Text steht auf S. 2204 das gamma = gamma / C_0 substituiert wird.
-    # TODO: Gamma is normalized on the Reference Capacity
+    # TODO: Gamma is normalized on the Reference Capacity, but C_0 = 1 so we'll leave it at that for now
     def derivu(self):
         u_deriv = -(self.u/self.tau) - (
                   self.w[0] * self.gam[0] * (1 + np.log(self.G))
@@ -296,12 +291,18 @@ class InitModel:
     # Fehlerfunktion nach S.2207
     def calcError(self):
         _, g_delta = self.delta()
-        return np.abs(g_delta - self.G)**2
+        return np.abs(g_delta -  self.G)**2
 
 
-# G und C als .shape = (bla,) Vektoren übergeben!
-x = InitModel(np.random.randint(1, 9, size=16)/100, np.random.randint(1, 9, size=12)/1000,
-              np.random.randint(1, 4, size=(12, 16)))
-# TODO: Siehe ModelInit
-# m = InitModel(S, groesse)
-# blubb = m.calc_g(bla)
+    def calc_G(self):
+        self.updateWeights()
+        self.updateImage()
+        Error = self.calcError()
+        if len(np.where(Error > 1e-4)[0]) == 0:
+            return self.delta()
+
+
+# S = Sensitivity Matrix, ImageSize = Tupel with Imagedimensions
+
+Model = InitModel(S, ImageSize)
+Solution = Model.calc_G()

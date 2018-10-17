@@ -15,7 +15,7 @@ import numpy as np
 
 class InitModel:
 
-    def __init__(self, S, ImageSize, deltat = 0.01, tau = 1, alpha_0 = 7, beta = 2, xi = 5, zeta = 1,
+    def __init__(self, C, S, ImageSize, deltat = 0.01, tau = 1, alpha_0 = 7, beta = 2, eta = 1, xi = 5, zeta = 1,
                  smoothing_weights = (1, -1/8, -1/8), w = (1/3, 1/3, 1/3)):
         self.t = 0 # Time
         self.deltat = deltat # Algorithm Steplength
@@ -24,13 +24,16 @@ class InitModel:
         self.beta = beta # Steepness gain factor - vertical slope and the horizontal spread of the sigmoid-shape function
         self.xi = xi # y-Axis intercept of the linear activation function
         self.zeta = zeta # TODO: ??
+        self.eta = eta
         self.gam = np.zeros(3) # Initialize Gamma_1,2,3 to zero
-        self.v = self.activation(self.u) # Initialize Node Outputs
-        self.G = np.zeros(ImageSize[0]*ImageSize[1]) # Initializing Image Vector
+        self.G = 2*np.ones(ImageSize[0]*ImageSize[1]) # Initializing Image Vector
         self.u = np.zeros(len(self.G)) # Init. of Network Input Vector
         self.u_deltat = np.zeros(len(self.G)) #
+        self.v = self.activation(self.u) # Initialize Node Outputs
         self.G_deltat = np.zeros(len(self.G))
-        # self.C = C
+        self.G_width = ImageSize[1]
+        self.G_height = ImageSize[0]
+        self.C = C
         self.S = S
         self.z, self.deltaz = self.rel()
         self.smoothing_weights = smoothing_weights# Smoothing Weights for smoothing the Image vector
@@ -40,11 +43,12 @@ class InitModel:
     # Ist self.gam hier wirklich das gleiche wie in den anderen Funktionen? Im
     # Text steht auf S. 2204 das gamma = gamma / C_0 substituiert wird.
     # TODO: Gamma is normalized on the Reference Capacity, but C_0 = 1 so we'll leave it at that for now
+    # TODO: Problem: Log(G) geht nicht, da G auf zeros initialisiert wird!!!!
     def derivu(self):
         u_deriv = -(self.u/self.tau) - (
                   self.w[0] * self.gam[0] * (1 + np.log(self.G))
                 + self.w[1] * self.gam[1] * np.dot(self.S.T, self.z)
-                + self.w[2] * self.gam[2] * (np.dot(self.X, self.G) + self.G)
+                + self.w[2] * self.gam[2] * (self.smoothie(self.G) + self.G)
                 + np.dot(self.S.T, self.deltaz)
                 )
         return u_deriv
@@ -206,7 +210,7 @@ class InitModel:
         for i in range(XG.size):
             E, V = self.get_neighbours(i) # returns 2 lists of indices
             XG[i] +=   self.smoothing_weights[1] * np.sum(G[E]) \
-                     + self.smoothing_weigths[2] * np.sum(G[V])
+                     + self.smoothing_weights[2] * np.sum(G[V])
         return XG
 
 
@@ -235,14 +239,15 @@ class InitModel:
 
     # Gamma-Konstanten für die Objektfunktionen nach S. 2206
     def calcGamma(self):
-        gamsum = 0
-        gamsum = np.sum(np.dot(self.G, np.log(self.G)))
+        gamsum = np.dot(self.G, np.log(self.G))
+        G_2darray = np.reshape(self.G, (len(self.G), 1))
 
         self.gam[0] = 1 / gamsum
+        # TODO: HIER IST GLAUB ICH EIN SCHREIBFEHLER IM PAPER, ES MÜSSTE MINUS C HEIßEN DA DIE DIMENSIONEN JA GARNICHT
+        # TODO: STIMMEN KÖNNEN!!!
+        self.gam[1] = 1 / (0.5 * np.abs(np.dot(self.S, G_2darray) - self.G))**2
 
-        self.gam[1] = 1 / (0.5 * np.abs(np.dot(self.S, self.G) - self.G))**2
-
-        self.gam[2] = 1 / (0.5 * np.dot(np.dot(self.G.T, self.X), self.G) + 0.5 * np.dot(self.G.T, self.G))
+        self.gam[2] = 1 / (0.5 * np.dot(np.dot(self.G.T, self.smoothie(self.G))) + 0.5 * np.dot(self.G.T, self.G))
 
     # Gewichtungsänderung bei Iterationsschritt berechnen nach S. 2206
     def deltaWeights(self, n):
@@ -293,16 +298,23 @@ class InitModel:
         _, g_delta = self.delta()
         return np.abs(g_delta -  self.G)**2
 
-
-    def calc_G(self):
+    def updatingStep(self):
+        self.calcGamma()
         self.updateWeights()
         self.updateImage()
+
+    def calc_G(self):
+        self.updatingStep()
         Error = self.calcError()
         if len(np.where(Error > 1e-4)[0]) == 0:
             return self.delta()
+        else:
+            self.timestep()
 
 
 # S = Sensitivity Matrix, ImageSize = Tupel with Imagedimensions
-
-Model = InitModel(S, ImageSize)
-Solution = Model.calc_G()
+S = np.random.randn(66, 32**2)
+C = np.random.randn(66)
+ImageSize = (32, 32)
+Model = InitModel(C, S, ImageSize)
+_, ImageSolution = Model.calc_G()

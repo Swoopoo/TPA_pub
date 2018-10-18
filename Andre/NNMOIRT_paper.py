@@ -1,5 +1,6 @@
 import numpy as np
-
+from tpamodules.import_S_matrix import importMatFile
+from tpamodules.import_C_matrix import importCMatrix
 # Basiert auf Paper: 'Neural network based multi-criterion
 # optimization image reconstruction
 # technique for imaging two- and
@@ -17,7 +18,7 @@ class InitModel:
 
     def __init__(self, C, S, ImageSize, deltat = 0.01, tau = 1, alpha_0 = 7, beta = 2, eta = 1, xi = 0, zeta = 5,
                  smoothing_weights = (1, -1/8, -1/8), w = (1/3, 1/3, 1/3)):
-        self.t = 0 # Time
+        self.t = 0	 # Time
         self.deltat = deltat # Algorithm Steplength
         self.tau = tau# = R_0 C_0 # Time Constant of the capacitors - set to 1.0 to measure in units \tau
         self.alpha_0 = alpha_0 # penalty Parameter
@@ -51,7 +52,7 @@ class InitModel:
         return u_deriv
 
     def initializeG(self, C):
-        return np.dot(self.S.T, np.reshape(C, (len(C), 1)))
+        return np.dot(self.S.T, C)
 
     # Alpha nach 2204 (29)
     def alpha(self, t):
@@ -73,18 +74,18 @@ class InitModel:
         self.u, self.G = self.delta()
 
     # z und deltaz nach S. 2204 (28) und (27)
-    # Spratte: Müsste ich mir zwar nochmal ansehen, aber das müsste auch ohne
+    # Spratte: Muesste ich mir zwar nochmal ansehen, aber das muesste auch ohne
     # doppelte for-Schleife implementierbar sein (for-Schleifen sind teuer in
     # Python, die numpy-Routinen sind wesentlich schneller).
-    # z müsste doch eigentlich
+    # z muesste doch eigentlich
     #    z = np.dot(self.S, self.G) - self.C
-    # sein. Dementsprechend wäre die Funktion hier dann:
+    # sein. Dementsprechend waere die Funktion hier dann:
     #def rel(self):
         #z = np.dot(self.S, self.G) - self.C
         #deltaz = self.alpha(self.t) * z
         #deltaz[np.where(deltaz < 0)] = 0
     # Ich bin mir nicht sicher, ob die Implementierung oben wirklich optimal
-    # ist oder ob es schneller ginge, nähme man eine for-Schleife für die
+    # ist oder ob es schneller ginge, naehme man eine for-Schleife fuer die
     # Berechnung von deltaz.
     def calcDeltaz(self): # delta(z) Berechnung
         z = np.zeros(len(self.C))
@@ -99,7 +100,7 @@ class InitModel:
 
     # Objektfunktion f1 nach S. 2203 (14)
     def func1(self, G):
-        # Entropie Funktion des Bildes - lässt Aussage über die 'global smoothness' des Bildvektors treffen (14)
+        # Entropie Funktion des Bildes - laesst Aussage ueber die 'global smoothness' des Bildvektors treffen (14)
         # G = Bildvektor
         # len(G) = Anzahl an Neuronen
         # G(j) = Wert des j-ten Neurons
@@ -110,15 +111,15 @@ class InitModel:
 
     # Objektfunktion f2 nach S. 2203 (15)
     def func2(self, G):
-        # zurückrechnen auf Kapazitäten (15)
-        # S = Sensitivitätsmatrix
+        # zurueckrechnen auf Kapazitaeten (15)
+        # S = Sensitivitaetsmatrix
         # G = Bildvektor
-        # C = Gemessene Kapazitäten
+        # C = Gemessene Kapazitaeten
         # ga2 = normalisierte Konstante 0 <= ga2 <= 1
         #
         # Anmerkungen:
-        #  - Warum ist C in self, aber G nicht? Müsste C nicht auch extern sein?
-        #    Immerhin ändert sich C wie G mit jeder Messung, während S statisch
+        #  - Warum ist C in self, aber G nicht? Muesste C nicht auch extern sein?
+        #    Immerhin aendert sich C wie G mit jeder Messung, waehrend S statisch
         #    ist.
         err = np.zeros((len(G),len(G)))
         errsq = np.zeros((len(G), len(G)))
@@ -129,15 +130,15 @@ class InitModel:
         f2 = 0.5 * self.gam[1] * errsq
         return f2
         # Alternative Implementierung von Spratte:
-        #   Datentyp abhängig:
+        #   Datentyp abhaengig:
         #     self.S : np.array
         #     self.C : np.array
         #     G      : np.array
         # entweder (bei kleinen Arrays schneller)
         f2 = .5 * self.gam[1] * np.sum(np.square(self.S.dot(G) - self.C))
-        # oder (bei großen Arrays schneller)
+        # oder (bei grossen Arrays schneller)
         f2 = .5 * self.gam[1] * np.sum(np.square(self.S @ G - self.C))
-        #   Matrix soll overhead haben gegenüber array
+        #   Matrix soll overhead haben gegenueber array
         #   (https://stackoverflow.com/a/3892639/6783373) -> array ist besser
         #     self.S : np.matrix
         #     self.C : np.matrix
@@ -146,32 +147,32 @@ class InitModel:
 
     # Objektfunktion f3 nach S. 2203 (16)
     def func3 (self, G):  # sum of the non-uniformity and peakedness functions of an image (16) - minimiert um locale
-        #  'smoothness' und kleine 'peakedness' zu gewährleisten
+        #  'smoothness' und kleine 'peakedness' zu gewaehrleisten
         # G = Image Vektor
-        # X = N x N non-uniformity Matrix, 'smoothing' Matrix, für Wert[i,k] gilt (1 <= j <= N):
+        # X = N x N non-uniformity Matrix, 'smoothing' Matrix, fuer Wert[i,k] gilt (1 <= j <= N):
         #           x1  wenn    k = j
         #           x2  wenn    k E E[j]
         #           x3  wenn    k E V[j]
         #           0   wenn    sonst
         #       E[j] Indexe der Pixel, die genau EINE Kante mit dem Pixel j gemeinsam haben
         #       V[j] Indexe der Pixel, die genau EINEN Knoten mit dem Pixel j gemeinsam haben
-        #       x1, x2, x3 == smoothing weights == (1, -1/8, -1/8) für die Standard-Smoothing Matrix
+        #       x1, x2, x3 == smoothing weights == (1, -1/8, -1/8) fuer die Standard-Smoothing Matrix
         f3 = 0.5 * self.gam[2] * (np.dot(np.dot(G.T, self.X), G) + np.dot(G.T,G))
         return f3
 
-    # Spratte: Lösung für Berechnung der smoothMat (S.2202):
+    # Spratte: Loesung fuer Berechnung der smoothMat (S.2202):
     # Unterstellt: Rechteckiges Bild mit Breite self.G_width, G[0] in linker
     # oberer Ecke, G[1] der zweite Pixel von links in der obersten Reihe
-    # (Reihenfolge eigentlich nicht wirklich wichtig, bloß G[0] in einer Ecke
+    # (Reihenfolge eigentlich nicht wirklich wichtig, bloss G[0] in einer Ecke
     # und self.G_width die Breite in die erste Richtung -- also
     # G[self.G_width-1] der letzte Pixel in der ersten Reihe/Spalte). Die
     # Funktion skaliert allerdings relativ schlecht (O(n) = n**2)
-    # Spratte: Für große Matrizen wird extrem viel Speicher benötigt. Auf meinem
-    # Laptop ist bei 200x200 Pixeln Bildgröße schluss. Eventuell müssen wir auf
+    # Spratte: Fuer grosse Matrizen wird extrem viel Speicher benoetigt. Auf meinem
+    # Laptop ist bei 200x200 Pixeln Bildgroesse schluss. Eventuell muessen wir auf
     # langsamere aber speicherfreundlichere Berechnungen umsteigen -- oder aber
     # ich schreibe doch noch ein Modul in C.
     # Die Speichermenge wechst in 4ter Potenz mit der Bildbreite, bzw.
-    # quadtratisch zur Pixelzahl, wobei ein 1x1 np.array 8 byte benötigt.
+    # quadtratisch zur Pixelzahl, wobei ein 1x1 np.array 8 byte benoetigt.
     #
     # TODO: Evtl. RAM Abfragen ob smoothMat2 benutzt werden kann
     #def smoothMat2(size,width):
@@ -179,9 +180,9 @@ class InitModel:
         #for i in range(size):
             #X[i][i] = 1 #x1
             #for j in range(i+1,size):
-                #i_row = i // width # Python 3 Syntax für Integerdivision
+                #i_row = i // width # Python 3 Syntax fuer Integerdivision
                 #i_col = i %  width
-                #j_row = j // width # Python 3 Syntax für Integerdivision
+                #j_row = j // width # Python 3 Syntax fuer Integerdivision
                 #j_col = j %  width
                 #if   i_row == j_row          and abs(i_col - j_col) == 1 :
                     #X[i,j] = -1/8 #x2
@@ -196,9 +197,9 @@ class InitModel:
         #if i == j: return x1
         #x2 = -1/8
         #x3 = -1/8
-        #i_row = i // self.G_width # Python 3 Syntax für Integerdivision
+        #i_row = i // self.G_width # Python 3 Syntax fuer Integerdivision
         #i_col = i %  self.G_width
-        #j_row = j // self.G_width # Python 3 Syntax für Integerdivision
+        #j_row = j // self.G_width # Python 3 Syntax fuer Integerdivision
         #j_col = j %  self.G_width
         #if i_row == j_row          and abs(i_col - j_col) == 1 : return x2
         #if abs(i_row - j_row) == 1 and i_col == j_col          : return x2
@@ -237,19 +238,19 @@ class InitModel:
             E.append(i + 1)
         return (E, V)
 
-    # Gamma-Konstanten für die Objektfunktionen nach S. 2206
+    # Gamma-Konstanten fuer die Objektfunktionen nach S. 2206
     def calcGamma(self):
         gamsum = np.dot(self.G, np.log(self.G))
         G_2darray = np.reshape(self.G, (len(self.G), 1))
 
         self.gam[0] = 1 / gamsum
-        # TODO: HIER IST GLAUB ICH EIN SCHREIBFEHLER IM PAPER, ES MÜSSTE MINUS C HEIßEN DA DIE DIMENSIONEN JA GARNICHT
-        # TODO: STIMMEN KÖNNEN!!!
+        # TODO: HIER IST GLAUB ICH EIN SCHREIBFEHLER IM PAPER, ES MueSSTE MINUS C HEIssEN DA DIE DIMENSIONEN JA GARNICHT
+        # TODO: STIMMEN KoeNNEN!!!
         self.gam[1] = 1 / (0.5 * np.abs(np.dot(self.S, G_2darray) - self.G))**2
 
         self.gam[2] = 1 / (0.5 * np.dot(np.dot(self.G.T, self.smoothie(self.G))) + 0.5 * np.dot(self.G.T, self.G))
 
-    # Gewichtungsänderung bei Iterationsschritt berechnen nach S. 2206
+    # Gewichtungsaenderung bei Iterationsschritt berechnen nach S. 2206
     def deltaWeights(self, n):
         _, g_delta = self.delta()
         if n == 1:
@@ -275,13 +276,13 @@ class InitModel:
     # Spratte: Ich glaube, das Paper hat hier einen Fehler (bzw. es fehlt
     # Information). Der Sinn einer Aktivierungsfunktion ist doch, den Wert
     # zwischen 0 und 1 zu halten. Die angegebene Funktion tut dies aber nicht.
-    # Ich glaube es müsste heißen:
+    # Ich glaube es muesste heissen:
     #
     #               / 0               if      beta u_j + xi <= 0
     #     f(u_j) = <  beta u_j + xi   if 0 <  beta u_j + xi < 1
     #               \ 1               if 1 <= beta u_j + xi
     #
-    # Das stimmt mit der Definition aus dem Paper überein, solange beta und xi
+    # Das stimmt mit der Definition aus dem Paper ueberein, solange beta und xi
     # in einem bestimmten Intervall liegen (genauer: solange beta = 1).
     # Sollte meine Vermutung richtig sein, ist folgende Implementierung ein
     # bisschen schneller:
@@ -296,7 +297,7 @@ class InitModel:
     # Fehlerfunktion nach S.2207
     def calcError(self):
         _, g_delta = self.delta()
-        return np.abs(g_delta -  self.G)**2
+        return np.abs(g_delta - self.G)**2
 
     def updatingStep(self):
         self.calcGamma()
@@ -315,8 +316,15 @@ class InitModel:
 
 
 # S = Sensitivity Matrix, ImageSize = Tupel with Imagedimensions
-S = np.random.randn(66, 32**2)
-C = np.absolute(np.random.randn(66))
-ImageSize = (32, 32)
+#S = np.random.randn(66, 32**2)
+#C = np.absolute(np.random.randn(66))
+#ImageSize = (32, 32)
+SMatrixPfad = '/home/andre/Documents/Studium/Teamprojektarbeit/Datenundshit/Daten_TPA_2/S_matrix_quadratisch.mat'
+S = importMatFile(SMatrixPfad)
+
+CMatrixPfad = '/home/andre/Documents/Studium/Teamprojektarbeit/Datenundshit/Daten_TPA/3_Kreise.txt'
+C = importCMatrix(CMatrixPfad)
+ImageSize = (91, 91)
+
 Model = InitModel(C, S, ImageSize)
 _, ImageSolution = Model.calc_G(C)

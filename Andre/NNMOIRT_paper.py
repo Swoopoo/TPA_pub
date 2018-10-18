@@ -15,7 +15,7 @@ import numpy as np
 
 class InitModel:
 
-    def __init__(self, C, S, ImageSize, deltat = 0.01, tau = 1, alpha_0 = 7, beta = 2, eta = 1, xi = 5, zeta = 1,
+    def __init__(self, C, S, ImageSize, deltat = 0.01, tau = 1, alpha_0 = 7, beta = 2, eta = 1, xi = 0, zeta = 5,
                  smoothing_weights = (1, -1/8, -1/8), w = (1/3, 1/3, 1/3)):
         self.t = 0 # Time
         self.deltat = deltat # Algorithm Steplength
@@ -26,16 +26,13 @@ class InitModel:
         self.zeta = zeta # TODO: ??
         self.eta = eta
         self.gam = np.zeros(3) # Initialize Gamma_1,2,3 to zero
-        self.G = 2*np.ones(ImageSize[0]*ImageSize[1]) # Initializing Image Vector
-        self.u = np.zeros(len(self.G)) # Init. of Network Input Vector
-        self.u_deltat = np.zeros(len(self.G)) #
+        self.u = np.zeros(ImageSize[0] * ImageSize[1]) # Init. of Network Input Vector
+        self.u_deltat = np.zeros(ImageSize[0] * ImageSize[1]) #
         self.v = self.activation(self.u) # Initialize Node Outputs
-        self.G_deltat = np.zeros(len(self.G))
         self.G_width = ImageSize[1]
         self.G_height = ImageSize[0]
         self.C = C
         self.S = S
-        self.z, self.deltaz = self.rel()
         self.smoothing_weights = smoothing_weights# Smoothing Weights for smoothing the Image vector
         self.w = np.array(w) # Initial Values vor omega_1,2,3
 
@@ -52,6 +49,9 @@ class InitModel:
                 + np.dot(self.S.T, self.deltaz)
                 )
         return u_deriv
+
+    def initializeG(self, C):
+        return np.dot(self.S.T, np.reshape(C, (len(C), 1)))
 
     # Alpha nach 2204 (29)
     def alpha(self, t):
@@ -86,7 +86,7 @@ class InitModel:
     # Ich bin mir nicht sicher, ob die Implementierung oben wirklich optimal
     # ist oder ob es schneller ginge, nähme man eine for-Schleife für die
     # Berechnung von deltaz.
-    def rel(self): # delta(z) Berechnung
+    def calcDeltaz(self): # delta(z) Berechnung
         z = np.zeros(len(self.C))
         deltaz = np.zeros(len(self.C))
         for i in range(len(self.C)):
@@ -263,7 +263,7 @@ class InitModel:
     def updateWeights(self):
         for i in range(3):
             weightsum = 0
-            for k in range(1,4):
+            for k in range(3):
                 weightsum += (self.deltaWeights(1) / self.deltaWeights(k+1))
             self.w[i] = (self.deltaWeights(1) / self.deltaWeights(i+1))/weightsum
 
@@ -303,7 +303,9 @@ class InitModel:
         self.updateWeights()
         self.updateImage()
 
-    def calc_G(self):
+    def calc_G(self, C):
+        self.C = C
+        self.G = self.initializeG(C)
         self.updatingStep()
         Error = self.calcError()
         if len(np.where(Error > 1e-4)[0]) == 0:
@@ -314,7 +316,7 @@ class InitModel:
 
 # S = Sensitivity Matrix, ImageSize = Tupel with Imagedimensions
 S = np.random.randn(66, 32**2)
-C = np.random.randn(66)
+C = np.absolute(np.random.randn(66))
 ImageSize = (32, 32)
 Model = InitModel(C, S, ImageSize)
-_, ImageSolution = Model.calc_G()
+_, ImageSolution = Model.calc_G(C)

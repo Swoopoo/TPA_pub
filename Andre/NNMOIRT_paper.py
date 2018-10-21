@@ -1,19 +1,20 @@
 import numpy as np
 from tpamodules.import_S_matrix import importMatFile
 from tpamodules.import_C_matrix import importCMatrix
-# Basiert auf Paper: 'Neural network based multi-criterion
+# Based on the paper 'Neural network based multi-criterion
 # optimization image reconstruction
 # technique for imaging two- and
 # three-phase flow systems using electrical
 # capacitance tomography'
 # -----------------------------------------------------
-# von W. Warsito und L-S Fan
+# from W. Warsito und L-S Fan
 # -----------------------------------------------------
 # -----------------------------------------------------
 #
 # STAND: 16.10.2018
 # TODO: Rest der Funktionen (23+) durchsehen ob passen
 
+# Initialize the model
 class InitModel:
 
     def __init__(self, C, S, ImageSize, deltat = 0.01, tau = 1, alpha_0 = 7, beta = 2, eta = 1, xi = 0, zeta = 5,
@@ -42,63 +43,55 @@ class InitModel:
     # Text steht auf S. 2204 das gamma = gamma / C_0 substituiert wird.
     # TODO: Gamma is normalized on the Reference Capacity, but C_0 = 1 so we'll leave it at that for now
     # TODO: Problem: Log(G) geht nicht, da G auf zeros initialisiert wird!!!!
+
+    # Calculate the derivative of u according to equation 31 (p.2205)
     def derivu(self):
         u_deriv = -(self.u/self.tau) - (
                   self.w[0] * self.gam[0] * (1 + np.log(self.G))
-                + self.w[1] * self.gam[1] * np.dot(self.S.T, self.z)
+                + self.w[1] * self.gam[1] * np.dot(self.S.T, self.calcZ())
                 + self.w[2] * self.gam[2] * (self.smoothie(self.G) + self.G)
-                + np.dot(self.S.T, self.deltaz)
+                + np.dot(self.S.T, self.calcDeltaZ())
                 )
         return u_deriv
 
+
+    # Penalty Parameter alpha according to equation 29 (p.2204)
+    def penaltyAlpha(self):
+        return self.alpha_0 + self.zeta * np.exp(-1 * self.eta * self.t)
+
+
+    # Calculate z according to equation 28 (p.2204)
+    def calcZ(self):
+        z = np.sum(np.dot(self.S, self.G) - self.C)
+        return z
+
+
+    # Calculate delta(z) according to equation 27 (p.2204)
+    def calcDeltaZ(self):
+        deltaz = self.penaltyAlpha() * self.calcZ()
+        deltaz[z <= 0] = 0
+        return deltaz
+
+
+    # Initialize first Imagevector G
     def initializeG(self, C):
         return np.dot(self.S.T, C)
 
-    # Alpha nach 2204 (29)
-    def alpha(self, t):
-        # Spratte: kleiner Fehler, der komische griechische Buchstabe ist ein
-        # zeta: alpha_0, zeta, eta >= 0
-        return self.alpha_0 + self.zeta * np.exp(-self.eta * t)
 
-
-    # G(t+deltat) bzw. u(t+deltat) nach S. 2205 (36) bzw. (33)
+    # Calculate G and u at the next timestep according to equation
     def delta(self):
         u_deltat = self.u + self.derivu() * self.deltat
         G_deltat = self.G + self.beta * self.derivu() * self.deltat
         return u_deltat, G_deltat
 
 
-    # Zeitschritt machen
+    # Perform a step in the internal algorithm time
     def timestep(self):
         self.t += self.deltat
         self.u, self.G = self.delta()
 
-    # z und deltaz nach S. 2204 (28) und (27)
-    # Spratte: Muesste ich mir zwar nochmal ansehen, aber das muesste auch ohne
-    # doppelte for-Schleife implementierbar sein (for-Schleifen sind teuer in
-    # Python, die numpy-Routinen sind wesentlich schneller).
-    # z muesste doch eigentlich
-    #    z = np.dot(self.S, self.G) - self.C
-    # sein. Dementsprechend waere die Funktion hier dann:
-    #def rel(self):
-        #z = np.dot(self.S, self.G) - self.C
-        #deltaz = self.alpha(self.t) * z
-        #deltaz[np.where(deltaz < 0)] = 0
-    # Ich bin mir nicht sicher, ob die Implementierung oben wirklich optimal
-    # ist oder ob es schneller ginge, naehme man eine for-Schleife fuer die
-    # Berechnung von deltaz.
-    def calcDeltaz(self): # delta(z) Berechnung
-        z = np.zeros(len(self.C))
-        deltaz = np.zeros(len(self.C))
-        for i in range(len(self.C)):
-            zsum = 0
-            for j in range(len(self.G)):
-                zsum += self.S[i, j] * self.G[j] - self.C[i]
-            z[i] = zsum
-            if z[i] > 0: deltaz[i] = self.alpha(self.t) * z[i]
-        return z, deltaz
 
-    # Objektfunktion f1 nach S. 2203 (14)
+    # Objectfunction f1 according to equation 14 (p. 2203)
     def func1(self, G):
         # Entropie Funktion des Bildes - laesst Aussage ueber die 'global smoothness' des Bildvektors treffen (14)
         # G = Bildvektor
@@ -109,7 +102,8 @@ class InitModel:
         f1 = self.gam[0] * np.dot(G,np.log(G))
         return f1
 
-    # Objektfunktion f2 nach S. 2203 (15)
+
+    # Objectfunction f2 according to equation 15 (p. 2203)
     def func2(self, G):
         # zurueckrechnen auf Kapazitaeten (15)
         # S = Sensitivitaetsmatrix
@@ -145,7 +139,8 @@ class InitModel:
         #     G      : np.matrix
         # f2 = .5 * self.gam[1] * np.sum(np.square(self.S * G - C))
 
-    # Objektfunktion f3 nach S. 2203 (16)
+
+    # Objectfunction f3 according to equation 16 (p. 2203)
     def func3 (self, G):  # sum of the non-uniformity and peakedness functions of an image (16) - minimiert um locale
         #  'smoothness' und kleine 'peakedness' zu gewaehrleisten
         # G = Image Vektor
@@ -159,6 +154,7 @@ class InitModel:
         #       x1, x2, x3 == smoothing weights == (1, -1/8, -1/8) fuer die Standard-Smoothing Matrix
         f3 = 0.5 * self.gam[2] * (np.dot(np.dot(G.T, self.X), G) + np.dot(G.T,G))
         return f3
+
 
     # Spratte: Loesung fuer Berechnung der smoothMat (S.2202):
     # Unterstellt: Rechteckiges Bild mit Breite self.G_width, G[0] in linker
@@ -205,7 +201,7 @@ class InitModel:
         #if abs(i_row - j_row) == 1 and i_col == j_col          : return x2
         #if abs(i_row - j_row) == 1 and abs(i_col - j_col) == 1 : return x3
         #return 0
-    # Berechnet das Matrixprodukt X*G
+    # Calculate matrixprodukt X*G
     def smoothie(self, G):
         XG = self.smoothing_weights[0] * G.copy()
         for i in range(XG.size):
@@ -215,6 +211,7 @@ class InitModel:
         return XG
 
 
+    # Find neighbours for the smoothie calculation (lule)
     def get_neighbours(self, i):
         E = []
         V = []
@@ -238,19 +235,19 @@ class InitModel:
             E.append(i + 1)
         return (E, V)
 
-    # Gamma-Konstanten fuer die Objektfunktionen nach S. 2206
-    def calcGamma(self):
-        gamsum = np.dot(self.G, np.log(self.G))
-        G_2darray = np.reshape(self.G, (len(self.G), 1))
 
+    # Calculate gamma values for the algorithm according to equations on page 2207
+    def calcGamma(self):
+        G_1darray = np.reshape(self.G, (len(self.G)))
+        gamsum = np.dot(G_1darray, np.log(G_1darray))
         self.gam[0] = 1 / gamsum
         # TODO: HIER IST GLAUB ICH EIN SCHREIBFEHLER IM PAPER, ES MueSSTE MINUS C HEIssEN DA DIE DIMENSIONEN JA GARNICHT
         # TODO: STIMMEN KoeNNEN!!!
-        self.gam[1] = 1 / (0.5 * np.abs(np.dot(self.S, G_2darray) - self.G))**2
+        self.gam[1] = 1 / ((0.5 * np.linalg.norm(np.dot(self.S, self.G) - self.C))**2)
 
-        self.gam[2] = 1 / (0.5 * np.dot(np.dot(self.G.T, self.smoothie(self.G))) + 0.5 * np.dot(self.G.T, self.G))
+        self.gam[2] = 1 / ((0.5 * np.dot(self.G.T, self.smoothie(self.G)) + 0.5 * np.dot(self.G.T, self.G)))
 
-    # Gewichtungsaenderung bei Iterationsschritt berechnen nach S. 2206
+    # Calculate weights 1-3 according to p.2207
     def deltaWeights(self, n):
         _, g_delta = self.delta()
         if n == 1:
@@ -260,7 +257,8 @@ class InitModel:
         elif n == 3:
             return self.func3(g_delta) - self.func3(self.G)
 
-    # Gewichtungen updaten nach S. 2206
+
+    # Update weights according to the updatestep given on p.2207
     def updateWeights(self):
         for i in range(3):
             weightsum = 0
@@ -268,9 +266,11 @@ class InitModel:
                 weightsum += (self.deltaWeights(1) / self.deltaWeights(k+1))
             self.w[i] = (self.deltaWeights(1) / self.deltaWeights(i+1))/weightsum
 
-    # Bildvektor Updaten
+
+    # Calculate image vector according to equation 36
     def updateImage(self):
         _, self.G = self.delta()
+
 
     # Aktivierungsfunktion nach S.2204 (23)
     # Spratte: Ich glaube, das Paper hat hier einen Fehler (bzw. es fehlt
@@ -294,16 +294,20 @@ class InitModel:
         return v
 
 
-    # Fehlerfunktion nach S.2207
+    # Calculate the mean square error of the image vector
     def calcError(self):
         _, g_delta = self.delta()
-        return np.abs(g_delta - self.G)**2
+        return np.linalg.norm(g_delta - self.G)**2
 
+
+    # Run an updating step according to p.2207
     def updatingStep(self):
         self.calcGamma()
         self.updateWeights()
         self.updateImage()
 
+
+    # Calculate the image vector G from the given capacity values C
     def calc_G(self, C):
         self.C = C
         self.G = self.initializeG(C)
@@ -315,16 +319,13 @@ class InitModel:
             self.timestep()
 
 
-# S = Sensitivity Matrix, ImageSize = Tupel with Imagedimensions
-#S = np.random.randn(66, 32**2)
-#C = np.absolute(np.random.randn(66))
-#ImageSize = (32, 32)
+ImageSize = (91, 91)
+
 SMatrixPfad = '/home/andre/Documents/Studium/Teamprojektarbeit/Datenundshit/Daten_TPA_2/S_matrix_quadratisch.mat'
 S = importMatFile(SMatrixPfad)
 
 CMatrixPfad = '/home/andre/Documents/Studium/Teamprojektarbeit/Datenundshit/Daten_TPA/3_Kreise.txt'
 C = importCMatrix(CMatrixPfad)
-ImageSize = (91, 91)
 
 Model = InitModel(C, S, ImageSize)
 _, ImageSolution = Model.calc_G(C)

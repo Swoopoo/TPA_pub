@@ -28,8 +28,8 @@ class InitModel:
         self.zeta = zeta # TODO: ??
         self.eta = eta
         self.gam = np.zeros(3) # Initialize Gamma_1,2,3 to zero
-        self.u = np.zeros(ImageSize[0] * ImageSize[1]) # Init. of Network Input Vector
-        self.u_deltat = np.zeros(ImageSize[0] * ImageSize[1]) #
+        self.u = np.reshape(np.zeros(ImageSize[0] * ImageSize[1]), [ImageSize[0] * ImageSize[1], 1]) # Init. of Network Input Vector
+        self.u_deltat = np.reshape(np.zeros(ImageSize[0] * ImageSize[1]), [ImageSize[0] * ImageSize[1], 1])
         self.v = self.activation(self.u) # Initialize Node Outputs
         self.G_width = ImageSize[1]
         self.G_height = ImageSize[0]
@@ -62,14 +62,14 @@ class InitModel:
 
     # Calculate z according to equation 28 (p.2204)
     def calcZ(self):
-        z = np.sum(np.dot(self.S, self.G) - self.C)
+        z = np.dot(self.S, self.G) - self.C
         return z
 
 
     # Calculate delta(z) according to equation 27 (p.2204)
     def calcDeltaZ(self):
         deltaz = self.penaltyAlpha() * self.calcZ()
-        deltaz[z <= 0] = 0
+        deltaz[self.calcZ() <= 0] = 0
         return deltaz
 
 
@@ -81,14 +81,15 @@ class InitModel:
     # Calculate G and u at the next timestep according to equation
     def delta(self):
         u_deltat = self.u + self.derivu() * self.deltat
-        G_deltat = self.G + self.beta * self.derivu() * self.deltat
-        return u_deltat, G_deltat
+        g_deltat = self.G + self.beta * self.derivu() * self.deltat
+        return u_deltat, g_deltat
 
 
     # Perform a step in the internal algorithm time
     def timestep(self):
         self.t += self.deltat
         self.u, self.G = self.delta()
+        print('Timestep')
 
 
     # Objectfunction f1 according to equation 14 (p. 2203)
@@ -97,9 +98,9 @@ class InitModel:
         # G = Bildvektor
         # len(G) = Anzahl an Neuronen
         # G(j) = Wert des j-ten Neurons
-        # ga = normalisierte Konstante 0 <= ga1 <= 1
-
-        f1 = self.gam[0] * np.dot(G,np.log(G))
+        # ga = normalisierte Konstante 0 <= ga1 <=1
+        G_1darray = np.reshape(G, G.shape[0])
+        f1 = self.gam[0] * np.dot(G_1darray,np.log(G_1darray))
         return f1
 
 
@@ -115,13 +116,7 @@ class InitModel:
         #  - Warum ist C in self, aber G nicht? Muesste C nicht auch extern sein?
         #    Immerhin aendert sich C wie G mit jeder Messung, waehrend S statisch
         #    ist.
-        err = np.zeros((len(G),len(G)))
-        errsq = np.zeros((len(G), len(G)))
-        for i in range(len(G)):
-            for j in range(len(G)):
-                err += self.S[i, j] * G[j] - self.C[i]
-            errsq += err ** 2
-        f2 = 0.5 * self.gam[1] * errsq
+        f2 = 0.5 * self.gam[1] * np.linalg.norm(np.dot(self.S, G) - self.C)
         return f2
         # Alternative Implementierung von Spratte:
         #   Datentyp abhaengig:
@@ -129,9 +124,9 @@ class InitModel:
         #     self.C : np.array
         #     G      : np.array
         # entweder (bei kleinen Arrays schneller)
-        f2 = .5 * self.gam[1] * np.sum(np.square(self.S.dot(G) - self.C))
+        #f2 = .5 * self.gam[1] * np.sum(np.square(self.S.dot(G) - self.C))
         # oder (bei grossen Arrays schneller)
-        f2 = .5 * self.gam[1] * np.sum(np.square(self.S @ G - self.C))
+        #f2 = .5 * self.gam[1] * np.sum(np.square(self.S @ G - self.C))
         #   Matrix soll overhead haben gegenueber array
         #   (https://stackoverflow.com/a/3892639/6783373) -> array ist besser
         #     self.S : np.matrix
@@ -152,7 +147,7 @@ class InitModel:
         #       E[j] Indexe der Pixel, die genau EINE Kante mit dem Pixel j gemeinsam haben
         #       V[j] Indexe der Pixel, die genau EINEN Knoten mit dem Pixel j gemeinsam haben
         #       x1, x2, x3 == smoothing weights == (1, -1/8, -1/8) fuer die Standard-Smoothing Matrix
-        f3 = 0.5 * self.gam[2] * (np.dot(np.dot(G.T, self.X), G) + np.dot(G.T,G))
+        f3 = 0.5 * self.gam[2] * (np.dot(G.T, self.smoothie(G)) + np.dot(G.T, G))
         return f3
 
 
@@ -238,8 +233,8 @@ class InitModel:
 
     # Calculate gamma values for the algorithm according to equations on page 2207
     def calcGamma(self):
-        G_1darray = np.reshape(self.G, (len(self.G)))
-        gamsum = np.dot(G_1darray, np.log(G_1darray))
+
+        gamsum = np.dot(self.G_1darray, np.log(self.G_1darray))
         self.gam[0] = 1 / gamsum
         # TODO: HIER IST GLAUB ICH EIN SCHREIBFEHLER IM PAPER, ES MueSSTE MINUS C HEIssEN DA DIE DIMENSIONEN JA GARNICHT
         # TODO: STIMMEN KoeNNEN!!!
@@ -311,6 +306,7 @@ class InitModel:
     def calc_G(self, C):
         self.C = C
         self.G = self.initializeG(C)
+        self.G_1darray = np.reshape(self.G, (len(self.G)))
         self.updatingStep()
         Error = self.calcError()
         if len(np.where(Error > 1e-4)[0]) == 0:

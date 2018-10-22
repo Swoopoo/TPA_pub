@@ -235,7 +235,7 @@ class InitModel:
 
     # Calculate gamma values for the algorithm according to equations on page 2207
     def calcGamma(self):
-
+        print('Calculate Gammas')
         gamsum = np.dot(self.G_1darray, np.log(self.G_1darray))
         self.gam[0] = 1 / gamsum
         # TODO: HIER IST GLAUB ICH EIN SCHREIBFEHLER IM PAPER, ES MueSSTE MINUS C HEIssEN DA DIE DIMENSIONEN JA GARNICHT
@@ -257,6 +257,7 @@ class InitModel:
 
     # Update weights according to the updatestep given on p.2207
     def updateWeights(self):
+        print('Updating Weights')
         for i in range(3):
             weightsum = 0
             for k in range(3):
@@ -267,6 +268,7 @@ class InitModel:
     # Calculate image vector according to equation 36
     def updateImage(self):
         _, self.G = self.delta()
+        print('Update Image')
 
 
     # Aktivierungsfunktion nach S.2204 (23)

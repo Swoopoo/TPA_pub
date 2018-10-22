@@ -18,7 +18,7 @@ from tpamodules.import_C_matrix import importCMatrix
 # Initialize the model
 class InitModel:
 
-    def __init__(self, C, S, ImageSize, deltat = 0.01, tau = 1, alpha_0 = 7, beta = 2, eta = 1, xi = 0.5, zeta = 5,
+    def __init__(self, C, S, ImageSize, deltat = 0.01, tau = 1, alpha_0 = 7, beta = 2, eta = 1, xi = 0.1, zeta = 5,
                  smoothing_weights = (1, -1/8, -1/8), w = (1/3, 1/3, 1/3)):
         self.t = 0	 # Time
         self.deltat = deltat # Algorithm Steplength
@@ -76,7 +76,8 @@ class InitModel:
 
     # Initialize first Imagevector G
     def initializeG(self, C):
-        return np.dot(self.S.T, C)
+        return self.activation(self.u)
+#        return np.dot(self.S.T, C)
 
 
     # Calculate G and u at the next timestep according to equation

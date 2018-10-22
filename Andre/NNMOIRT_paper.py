@@ -286,9 +286,8 @@ class InitModel:
     # bisschen schneller:
     def activation(self, u):
         v = self.beta * u + self.xi
-        for j in range(len(v)):
-            if v[j] < 0: v[j] = 0
-            elif v[j] > 1: v[j] = 1
+        v[v<0] = 0
+        v[v>1] = 1
         return v
 
 

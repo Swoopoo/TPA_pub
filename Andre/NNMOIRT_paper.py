@@ -317,13 +317,15 @@ class InitModel:
             self.timestep()
 
 
-ImageSize = (91, 91)
 
-SMatrixPfad = '/home/andre/Documents/Studium/Teamprojektarbeit/Datenundshit/Daten_TPA_2/S_matrix_quadratisch.mat'
-S = importMatFile(SMatrixPfad)
-S[S==0] = 1
-CMatrixPfad = '/home/andre/Documents/Studium/Teamprojektarbeit/Datenundshit/Daten_TPA/3_Kreise.txt'
-C = importCMatrix(CMatrixPfad)
+if __name__ == '__main__':
+    ImageSize = (91, 91)
+    SMatrixPfad = '/home/andre/Documents/Studium/Teamprojektarbeit/Datenundshit/Daten_TPA_2/S_matrix_quadratisch.mat'
+    S = importMatFile(SMatrixPfad)
+    S[S==0] = 1
 
-Model = InitModel(C, S, ImageSize)
-_, ImageSolution = Model.calc_G(C)
+    CMatrixPfad = '/home/andre/Documents/Studium/Teamprojektarbeit/Datenundshit/Daten_TPA/3_Kreise.txt'
+    C = importCMatrix(CMatrixPfad)
+
+    Model = InitModel(C, S, ImageSize)
+    _, ImageSolution = Model.calc_G(C)

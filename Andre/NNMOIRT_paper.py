@@ -1,6 +1,7 @@
 import numpy as np
 from tpamodules.import_S_matrix import importMatFile
 from tpamodules.import_C_matrix import importCMatrix
+
 # Based on the paper 'Neural network based multi-criterion
 # optimization image reconstruction
 # technique for imaging two- and
@@ -17,7 +18,7 @@ from tpamodules.import_C_matrix import importCMatrix
 # Initialize the model
 class InitModel:
 
-    def __init__(self, C, S, ImageSize, deltat = 0.01, tau = 1, alpha_0 = 7, beta = 2, eta = 1, xi = 0, zeta = 5,
+    def __init__(self, C, S, ImageSize, deltat = 0.01, tau = 1, alpha_0 = 7, beta = 2, eta = 1, xi = 0.5, zeta = 5,
                  smoothing_weights = (1, -1/8, -1/8), w = (1/3, 1/3, 1/3)):
         self.t = 0	 # Time
         self.deltat = deltat # Algorithm Steplength
@@ -319,7 +320,7 @@ ImageSize = (91, 91)
 
 SMatrixPfad = '/home/andre/Documents/Studium/Teamprojektarbeit/Datenundshit/Daten_TPA_2/S_matrix_quadratisch.mat'
 S = importMatFile(SMatrixPfad)
-
+S[S==0] = 1
 CMatrixPfad = '/home/andre/Documents/Studium/Teamprojektarbeit/Datenundshit/Daten_TPA/3_Kreise.txt'
 C = importCMatrix(CMatrixPfad)
 

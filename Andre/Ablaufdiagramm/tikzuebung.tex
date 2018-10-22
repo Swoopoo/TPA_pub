@@ -1,0 +1,143 @@
+\documentclass[%>>>
+     fontsize=11pt%
+    %,twoside%
+    ,ngerman%
+    ,paper=a4%
+    ,toc=listof%
+    ,toc=bib%
+    ,BCOR=3mm%
+    ,DIV=13%
+    ,open=any%
+    ,captions=tableabove%
+    ,headings=normal%
+]{scrreprt}%<<<
+
+
+
+% Packages >>>
+\usepackage[utf8]{inputenc}      % usage of most utf8 characters on input
+\usepackage[T1]{fontenc}         % usage of correct font encoding for Umlauts
+\usepackage{lmodern}             % scalable and slightly better looking font
+\usepackage{amsmath}             % mathematics
+\usepackage{mathtools}           % useful stuff for spacing etc.
+\usepackage{graphicx}            % easy include of images
+\usepackage{booktabs}            % prettier tables
+\usepackage[table]{xcolor}       % easy to use coloring
+%\usepackage{multirow}            % more than one row in a table column
+\usepackage{longtable}           % page breakable tables
+\usepackage{collcell}            % make a cell the argument of a command
+\usepackage{array}               % cool stuff for tables and the like
+\usepackage{placeins}            % better control over placement of figures
+\usepackage{csquotes}            % to silence biblatex's warnings concerning it
+\usepackage{scrlayer-scrpage}    % page header and footer configuration >>>
+\usepackage{pdfpages}
+\usepackage{multicol}
+\setlength{\columnsep}{1cm}
+    \KOMAoptions{%
+        ,headsepline=true%
+        ,headinclude=true%
+        %,headlines=2%
+    }
+    \setkomafont{pageheadfoot}{\sffamily}
+    \ihead*{\headmark}
+    \chead*{}
+    \ohead*{Blubberino}
+    \ifoot*{}
+    \cfoot*{}
+    \ofoot*{\pagemark}
+    \pagestyle{scrheadings}
+    \renewcommand*{\chapterpagestyle}{scrheadings}
+    \automark[chapter]{chapter} % both right and left chapters
+    %\automark*[section]{} % if there is a section right head containing section
+\usepackage[% babel >>>          % German language
+    main=ngerman%
+    ,english%
+]{babel}%<<<
+\usepackage{pgf}                 % plots
+\usepackage{xparse}              % better/easier macro creation
+\usepackage{setspace}            % consistent spacing
+\usepackage[export]{adjustbox}
+\usepackage{multicol}
+\usepackage{tabularx}
+\usepackage{tabulary}
+\usepackage{siunitx}             % consistent units and numbers formatting
+\usepackage{wrapfig}
+\usepackage{microtype}
+\usepackage{framed}
+\usepackage{hyperref}            % enables clickable links in pdf; load las
+\usepackage{tikz}
+\usetikzlibrary{positioning}
+%<<<
+
+\NewDocumentCommand\ts{ O{} m }{_{#1\text{#2}}}%
+\newtheorem{defi}{Definition}[section]
+\newcommand{\laplace}{\Delta}
+\setcounter{tocdepth}{0}
+\begin{document}
+	\begin{tikzpicture}[node distance=5mm and 5mm,
+	terminal/.style={
+		% The shape:
+		rectangle,minimum size=6mm,rounded corners=3mm,
+		% The rest
+		very thick,draw=black!50,
+		top color=white,bottom color=black!20,
+		font=\ttfamily}]
+	
+		\node (S) [terminal] 	{$S$};
+		\node (IM)	[terminal, below right=of S]{InitModel};
+		\node	(C0) [terminal, below left=of IM]{$C_0$};
+		\node (calcG) [terminal, right=of IM] {$calc\_G$};
+		\node (initG) [terminal, right=of calcG] {$initialize_G$};
+		\node (Ci) [terminal, below left=of calcG] {$C_i$};
+		\node (updatStep) [terminal, below=of IM, yshift=-30mm] {$updating\_Step$};
+		\node (calcGam)  [terminal, right=of updatStep] {$calc\_gamma$};
+		\node (calcGamNot) [below=of calcGam, yshift=5mm] {$\gamma_1, \gamma_2, \gamma_3$};
+		\node (calcGamNot2) [below=of calcGamNot, yshift=7mm] {aus G};
+		\node (smoothie) [terminal, right =of calcGam] {$smoothie$};
+		\node (neighbours) [terminal, right=of smoothie] {$get\_neighbours$};
+		\node (gams) [terminal, right=of neighbours] {$\gamma_1, \gamma_2, \gamma_3$};
+		\node (updateWeights) [terminal, below=of gams, yshift=-10mm] {$update\_weights$};
+		\node (calcDelta) [terminal, below=of updateWeights, yshift=-10mm] {calc $\Delta \omega$};
+		\node (func2) [terminal, below=of calcDelta] {$func2$};
+		\node (func1) [terminal, left=of func2] {$func1$};
+		\node (func3) [terminal, right=of func2] {$func3$};
+		\node (deltaW) [terminal, below= of func2] {$\Delta \omega_{1,2,3}$};
+		\node (updateImage) [terminal, below=of deltaW, yshift = -10mm] {$updateImage$};
+		\node (deltaz) [terminal, below left=of updateImage, yshift = -10mm, xshift = -13mm] {$z, \delta z$};
+		\node (derivu) [terminal, left= of deltaz, xshift = -5mm] {$u'$};
+		\node (smoothie2) [terminal, left =of derivu, xshift =-5mm] {$smoothie$};
+		\node (stop) [terminal, below=of updatStep, yshift = -30mm] {$calcError \leq 10^{-4}$};
+		\node (calcError) [terminal, below=of stop, yshift = -10mm] {$calcError$};
+		\node (delta) [terminal, below =of calcError, yshift = -10mm] {$G(t+\Delta t), u(t + \Delta t)$};
+		\node (stopnow) [terminal, right =of stop, xshift=15mm] {Stop};
+		
+		
+		\draw[->] (S) -- (IM);
+		\draw[->] (C0) -- (IM);
+		\draw[->] (IM) -- (calcG);
+		\draw[->] (Ci) -- (calcG);
+		\draw[->] (updatStep) -- (calcGam);
+		\draw[->] (calcG) -- (initG);
+		\draw[->] (initG) -- ++(0,-2.5) -| node[at start,below]{self.G} (updatStep);
+		\draw[->] (calcGam) -- (smoothie);
+		\draw[->] (smoothie) -- (neighbours);
+		\draw[->] (neighbours) -- (gams);
+		\draw[->] (gams) -- (updateWeights);
+		\draw[->] (updateWeights) -- (calcDelta);
+		\draw[->] (calcDelta) -- (func1);
+		\draw[->] (calcDelta) -- (func2);
+		\draw[->] (calcDelta) -- (func3);
+		\draw[->] (func2) -- (deltaW);
+		\draw[->] (func1) -- (deltaW);
+		\draw[->] (func3) -- (deltaW);
+		\draw[->] (deltaW) -- (updateImage);
+		\draw[->] (updateImage) |- (deltaz);
+		\draw[->] (deltaz) -- (derivu);
+		\draw[->] (derivu) -- (smoothie2);
+		\draw[->] (smoothie2) -| (delta);
+		\draw[->] (delta) -- (calcError);
+		\draw[->] (calcError) -- (stop);
+		\draw[->] (stop) -- node[left]{False} (updatStep);
+		\draw[->] (stop) -- node[below]{True} (stopnow);
+	\end{tikzpicture}
+\end{document}

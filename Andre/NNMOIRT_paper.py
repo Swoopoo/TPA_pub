@@ -1,5 +1,6 @@
 ##!/bin/python3
 import numpy as np
+import matplotlib.pyplot as plt
 from tpamodules.import_S_matrix import importMatFile
 from tpamodules.import_C_matrix import importCMatrix
 
@@ -231,15 +232,17 @@ class InitModel:
 
 #if __name__ == '__main__':
 ImageSize = (91, 91)
-#SMatrixPfad = '../Daten/S_matrix_quadratisch.mat'
-SMatrixPfad = '../Daten/Smatrix_16elek.mat'
+SMatrixPfad = '../Daten/S_matrix_quadratisch.mat'
+#SMatrixPfad = '../Daten/Smatrix_16elek.mat'
 S = importMatFile(SMatrixPfad)
-#S[S==0] = 1
 
 CMatrixPfad = '../Daten/3_Kreise.txt'
 C = importCMatrix(CMatrixPfad)
 
-#Model = InitModel(C, S, ImageSize)
-#ImageSolution = Model.calc_G(C)
-#print(ImageSolution)
-G = np.dot(S.T, C)
+Model = InitModel(C, S, ImageSize)
+ImageSolution = Model.calc_G(C)
+
+Image = np.reshape(ImageSolution, ImageSize)
+plot = plt.imshow(Image)
+print(ImageSolution)
+#G = np.dot(S.T, C)

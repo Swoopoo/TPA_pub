@@ -1,5 +1,12 @@
 import numpy as np
 
+# Implementation of the NNMOIRT algorithm as described in
+#   Neural network based multi criterion optimization image reconstruction
+#   technique for imaging two- and three-phase flow systems using electrical
+#   capacitance tomography
+# by W. Warsito and L.-S. Fan
+# Published in Measurement Science and Technology (vol. 12), 6. Nov. 2001
+
 # naming convention of this file:
 # variables:
 #   single word: TeX equivalent (so $S$ is S, $\alpha$ is alpha)
@@ -250,4 +257,4 @@ class NNMOIRT:# {{{
     # }}}
 # }}}
 
-# vim: fdm=markar fmr={{{,}}}
+# vim: fdm=marker fmr={{{,}}}

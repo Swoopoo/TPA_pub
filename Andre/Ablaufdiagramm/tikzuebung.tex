@@ -112,32 +112,33 @@
 		\node (stopnow) [terminal, right =of stop, xshift=15mm] {Stop};
 		
 		
-		\draw[->] (S) -- (IM);
-		\draw[->] (C0) -- (IM);
-		\draw[->] (IM) -- (calcG);
-		\draw[->] (Ci) -- (calcG);
-		\draw[->] (updatStep) -- (calcGam);
-		\draw[->] (calcG) -- (initG);
-		\draw[->] (initG) -- ++(0,-2.5) -| node[at start,below]{self.G} (updatStep);
-		\draw[->] (calcGam) -- (smoothie);
-		\draw[->] (smoothie) -- (neighbours);
-		\draw[->] (neighbours) -- (gams);
-		\draw[->] (gams) -- (updateWeights);
-		\draw[->] (updateWeights) -- (calcDelta);
-		\draw[->] (calcDelta) -- (func1);
-		\draw[->] (calcDelta) -- (func2);
-		\draw[->] (calcDelta) -- (func3);
-		\draw[->] (func2) -- (deltaW);
-		\draw[->] (func1) -- (deltaW);
-		\draw[->] (func3) -- (deltaW);
-		\draw[->] (deltaW) -- (updateImage);
-		\draw[->] (updateImage) |- (deltaz);
-		\draw[->] (deltaz) -- (derivu);
-		\draw[->] (derivu) -- (smoothie2);
-		\draw[->] (smoothie2) -| (delta);
-		\draw[->] (delta) -- (calcError);
-		\draw[->] (calcError) -- (stop);
-		\draw[->] (stop) -- node[left]{False} (updatStep);
-		\draw[->] (stop) -- node[below]{True} (stopnow);
+		\draw[->] (S) -- (IM)
+		[->] (C0) -- (IM)
+		[->] (IM) -- (calcG)
+		[->] (Ci) -- (calcG)
+		[->] (updatStep) -- (calcGam)
+		[->] (calcG) -- (initG)
+		[->] (initG) -- ++(0,-2.5) -| node[at start,below]{self.G} (updatStep)
+		[->] (calcGam) -- (smoothie)
+		[->] (smoothie) -- (neighbours)
+		[->] (neighbours) -- (gams)
+		[->] (gams) -- (updateWeights)
+		[->] (updateWeights) -- (calcDelta)
+		[->] (calcDelta) -- (func1)
+		[->] (calcDelta) -- (func2)
+		[->] (calcDelta) -- (func3)
+		[->] (func2) -- (deltaW)
+		[->] (func1) -- (deltaW)
+		[->] (func3) -- (deltaW)
+		[->] (deltaW) -- (updateImage)
+		[->] (updateImage) |- (deltaz)
+		[->] (deltaz) -- (derivu)
+		[->] (derivu) -- (smoothie2)
+		[->] (smoothie2) -| (delta)
+		[->] (delta) -- (calcError)
+		[->] (calcError) -- (stop)
+		[->] (stop) -- node[left]{t = t + $\Delta t$} (updatStep)
+		[->] (stop) -- node[below]{True} (stopnow)
+		;
 	\end{tikzpicture}
 \end{document}

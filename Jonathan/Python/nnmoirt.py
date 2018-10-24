@@ -61,6 +61,7 @@ class NNMOIRT:# {{{
     # }}}
 
     # activation functions {{{
+    # Eq. (23)
     def activation_linear(self, u):
         v = self.beta * u + self.xi
         v[v<=0] = 1e-50
@@ -68,10 +69,12 @@ class NNMOIRT:# {{{
         return v
     def reverse_activation_linear(self, v):
         return (v - self.xi) / self.beta
+    # Eq. (22)
     def activation_sigmoid(self, u):
         return 1 / ( 1 + np.exp(-self.beta * u) )
     def reverse_activation_sigmoid(self, v):
         return - np.log( 1/v - 1 ) / self.beta
+    # Eq. (37-39)
     def activation_double_step(self, u):
         v  = self.rho[0] / ( 1 + np.exp( -self.beta[0] * ( u + self.xi[0] ) ) )
         v += self.rho[1] / ( 1 + np.exp( -self.beta[1] * ( u + self.xi[1] ) ) )
@@ -83,6 +86,7 @@ class NNMOIRT:# {{{
     # }}}
 
     # calculate gamma_i {{{
+    # Equations as in "2. Update step" on page 2206
     def calc_gamma1(self, G):
         return 1 / ( np.dot(G, np.log(G)) )
     def calc_gamma2(self, G, C):
@@ -105,22 +109,25 @@ class NNMOIRT:# {{{
     def init_SC(self,C):
         v = np.dot(self.S.T, C)
         v[v<0] = 0
-        v[v<1] = 1
+        v[v>1] = 1
         return (self.reverse_activation(v), v)
     # }}}
 
     # f_i functions {{{
+    # Eq. (14)
     def f1(self, G, GSmoothed, C):
         return self.gamma[0] * np.dot(G, np.log(G))
+    # Eq. (15)
     def f2(self, G, GSmoothed, C):
         tmp = np.dot(self.S, G) - C
         return self.gamma[1] * np.dot(tmp, tmp)
-    # C is not necessary but we can use it in a loop if it accepts the argument
+    # Eq. (16)
     def f3(self, G, GSmoothed, C):
         return self.gamma[2] * ( np.dot(G, GSmoothed) + np.dot(G, G) )
     # }}}
 
     # calculate omega_i {{{
+    # Equations as in "2. Update step" on page 2206
     def calc_omega(self, GFuture, GFutureSmoothed, C):
         # Since $\gamma_i != \frac{1}{f_i(G)|_{\gamma_i=1}}$ one can subsitute
         # $f_i(G)$ with 1
@@ -133,6 +140,7 @@ class NNMOIRT:# {{{
     # }}}
 
     # function to smooth G returning the result of X*G {{{
+    # Implements X*G with X as in eq. (17)
     def smooth_G(self, G):
         XG = self.SmoothingWeights[0] * G.copy()
         for i in range(XG.size):
@@ -165,20 +173,18 @@ class NNMOIRT:# {{{
         return (E, V)
     # }}}
 
-    # update G {{{
-    def update_G(self, u, G, GSmoothed, C):
-        u += self.deltaT * self.u_deriv(u, G, GSmoothed, C)
-        return (u, self.activation(u))
-    # }}}
-
     # time dependent alpha {{{
+    # Eq. (29)
     def alpha(self):
         return self.alpha_0 + self.zeta * np.exp(-self.eta * self.time)
     # }}}
 
     # u derivate {{{
+    # Eq. (31)
     def u_deriv(self, u, G, GSmoothed, C):
+        # Eq. (28)
         z = np.dot(self.S, G) - C
+        # Eq. (27)
         deltaZ = self.alpha() * z
         deltaZ[z<0] = 0
         return - u / self.tau - (
@@ -187,6 +193,13 @@ class NNMOIRT:# {{{
                 + self.omega[2] * self.gamma[2] * (GSmoothed + G)
                 + np.dot(self.S.T, deltaZ)
                 )
+    # }}}
+
+    # update G {{{
+    # Eq. (33) and (34)
+    def update_G(self, u, G, GSmoothed, C):
+        u += self.deltaT * self.u_deriv(u, G, GSmoothed, C)
+        return (u, self.activation(u))
     # }}}
 
     # calc_G function {{{

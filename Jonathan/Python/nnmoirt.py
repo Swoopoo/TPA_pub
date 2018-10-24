@@ -20,6 +20,7 @@ class NNMOIRT:# {{{
             ,SmoothingWeights = (1, -1/8, -1/8)
             ,tau = 1
             ,deltaT = 0.01
+            ,eta = 1
             ):
         self.S = S
         self.ImgWd = ImageSize[0]
@@ -30,7 +31,10 @@ class NNMOIRT:# {{{
                 "Second dimension of S matrix doesn't match image size")
         self.beta = beta
         self.xi = xi
-        self.alpha = alpha_0
+        self.alpha_0 = alpha_0
+        self.time = 0
+        self.eta = eta
+        self.zeta = zeta
         self.zeta = zeta
         self.omega = omega
         self.SmoothingWeights = SmoothingWeights
@@ -59,7 +63,7 @@ class NNMOIRT:# {{{
     # activation functions {{{
     def activation_linear(self, u):
         v = self.beta * u + self.xi
-        v[v<=0] = 1e-20
+        v[v<=0] = 1e-50
         v[v>1] = 1
         return v
     def reverse_activation_linear(self, v):
@@ -167,10 +171,15 @@ class NNMOIRT:# {{{
         return (u, self.activation(u))
     # }}}
 
+    # time dependent alpha {{{
+    def alpha(self):
+        return self.alpha_0 + self.zeta * np.exp(-self.eta * self.time)
+    # }}}
+
     # u derivate {{{
     def u_deriv(self, u, G, GSmoothed, C):
         z = np.dot(self.S, G) - C
-        deltaZ = self.alpha * z
+        deltaZ = self.alpha() * z
         deltaZ[z<0] = 0
         return - u / self.tau - (
                 self.omega[0] * self.gamma[0] * ( 1 + np.log(G) )
@@ -211,7 +220,9 @@ class NNMOIRT:# {{{
         else:
             u, G = self.init_SC(C)
         GSmoothed = self.smooth_G(G)
+        self.time = 0
         for i in range(MaxIterations):
+            print('Iteration', i)
             self.gamma = self.calc_gamma(G, GSmoothed, C)
             u, GFuture = self.update_G(u, G, GSmoothed, C)
             tmp = GFuture - G
@@ -219,6 +230,7 @@ class NNMOIRT:# {{{
             GSmoothed = self.smooth_G(GFuture)
             self.omega = self.calc_omega(GFuture, GSmoothed, C)
             G = GFuture
+            self.time += self.deltaT
         if i == MaxIterations:
             print('Stopped after %d iterations!'%(MaxIterations))
         return GFuture

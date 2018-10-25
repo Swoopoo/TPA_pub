@@ -15,7 +15,7 @@ def read_and_shuffle_C_matrix(path, OneDimension=False):
     i_c = 1
     for i_out in range(1, i_end_out+1):
         for i_in in range(1, count+1):
-            sec_ind = i_in * i_out
+            sec_ind = i_in + i_out
             if sec_ind > count: sec_ind = sec_ind % count
             C_out[i_c-1] = C[i_in-1, sec_ind-1]
             i_c += 1

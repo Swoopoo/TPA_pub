@@ -42,8 +42,9 @@ class NNMOIRT:# {{{
         self.time = 0
         self.eta = eta
         self.zeta = zeta
-        self.zeta = zeta
         self.omega = omega
+        if len(SmoothingWeights) != 3:
+            raise ValueError("SmoothingWeights must be of length 3")
         self.SmoothingWeights = SmoothingWeights
         self.tau = tau
         self.deltaT = deltaT

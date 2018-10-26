@@ -28,6 +28,7 @@ class NNMOIRT:# {{{
             ,tau = 1
             ,deltaT = 0.01
             ,eta = 1
+            ,ActivationMin = 1e-50
             ):
         self.S = S
         self.ImgWd = ImageSize[0]
@@ -72,7 +73,7 @@ class NNMOIRT:# {{{
     # Eq. (23)
     def activation_linear(self, u):
         v = self.beta * u + self.xi
-        v[v<=0] = 1e-50
+        v[v<=self.ActivationMin] = self.ActivationMin
         v[v>1] = 1
         return v
     def reverse_activation_linear(self, v):
@@ -211,7 +212,7 @@ class NNMOIRT:# {{{
     # }}}
 
     # calc_G function {{{
-    def calc_G(self, C, InitZeros = True, MaxIterations = int(1e8), residuum = 1e-4):
+    def calc_G(self, C, InitZeros = True, MaxIterations = int(1e4), residuum = 1e-4):
         # doc string {{{
         """ calc_G: Calculates the image vector G for the measurement C.
             Input data:

@@ -29,6 +29,7 @@ class NNMOIRT:# {{{
             ,deltaT = 0.01
             ,eta = 1
             ,ActivationMin = 1e-50
+            ,ActivationMax = 1
             ):
         self.S = S
         self.ImgWd = ImageSize[0]
@@ -52,6 +53,8 @@ class NNMOIRT:# {{{
         self.f = ( self.f1, self.f2, self.f3 )
         # for double step
         self.rho = (1,1)
+        self.ActivationMin = ActivationMin
+        self.ActivationMax = ActivationMax
         if activation == 'linear':
             self.activation = self.activation_linear
             self.reverse_activation = self.reverse_activation_linear
@@ -73,8 +76,8 @@ class NNMOIRT:# {{{
     # Eq. (23)
     def activation_linear(self, u):
         v = self.beta * u + self.xi
-        v[v<=self.ActivationMin] = self.ActivationMin
-        v[v>1] = 1
+        v[v<self.ActivationMin] = self.ActivationMin
+        v[v>self.ActivationMax] = self.ActivationMax
         return v
     def reverse_activation_linear(self, v):
         return (v - self.xi) / self.beta
@@ -117,8 +120,8 @@ class NNMOIRT:# {{{
         return (u, self.activation(u))
     def init_SC(self,C):
         v = np.dot(self.S.T, C)
-        v[v<0] = 0
-        v[v>1] = 1
+        v[v<self.ActivationMin] = self.ActivationMin
+        v[v>self.ActivationMax] = self.ActivationMax
         return (self.reverse_activation(v), v)
     # }}}
 

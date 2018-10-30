@@ -64,6 +64,7 @@ class NNMOIRT:# {{{
                         'activation' key set to 'linear'.")
         if activation == 'linear':
             if ActivationOffsetted:
+                self.ActivationNewMax = ActivationMax + ActivationMin
                 self.activation = self.activation_linear_offset
                 self.reverse_activation = self.reverse_activation_linear_offset
             else:
@@ -97,7 +98,7 @@ class NNMOIRT:# {{{
     def activation_linear_offset(self, u):
         v = self.beta * u + self.xi + self.ActivationMin
         v[v<self.ActivationMin] = self.ActivationMin
-        v[v>self.ActivationMax] = self.ActivationMax
+        v[v>self.ActivationNewMax] = self.ActivationNewMax
         return v
     def reverse_activation_linear_offset(self, v):
         return (v - self.xi - self.ActivationMin) / self.beta
@@ -142,6 +143,7 @@ class NNMOIRT:# {{{
         v = np.dot(self.S.T, C)
         v[v<self.ActivationMin] = self.ActivationMin
         v[v>self.ActivationMax] = self.ActivationMax
+        if self.ActivationOffsetted: v += self.ActivationMin
         return (self.reverse_activation(v), v)
     # }}}
 
@@ -278,6 +280,7 @@ class NNMOIRT:# {{{
             self.time += self.deltaT
         if i == MaxIterations:
             print('Stopped after %d iterations!'%(MaxIterations))
+        if self.ActivationOffsetted: GFuture -= self.ActivationMin
         return GFuture
     # }}}
 # }}}

@@ -60,8 +60,8 @@ class NNMOIRT:# {{{
         if ActivationOffsetted:
             if activation != 'linear':
                 raise ValueError(
-                        "Offsetted Activation is only supported with the
-                        'activation' key set to 'linear'.")
+                        "Offsetted Activation is only supported with the "
+                        "'activation' key set to 'linear'.")
         if activation == 'linear':
             if ActivationOffsetted:
                 self.ActivationNewMax = ActivationMax + ActivationMin

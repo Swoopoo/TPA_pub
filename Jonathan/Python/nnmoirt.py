@@ -30,6 +30,7 @@ class NNMOIRT:# {{{
             ,eta = 1
             ,ActivationMin = 1e-50
             ,ActivationMax = 1
+            ,ActivationOffsetted = False
             ):
         self.S = S
         self.ImgWd = ImageSize[0]
@@ -55,9 +56,19 @@ class NNMOIRT:# {{{
         self.rho = (1,1)
         self.ActivationMin = ActivationMin
         self.ActivationMax = ActivationMax
+        self.ActivationOffsetted = ActivationOffsetted
+        if ActivationOffsetted:
+            if activation != 'linear':
+                raise ValueError(
+                        "Offsetted Activation is only supported with the
+                        'activation' key set to 'linear'.")
         if activation == 'linear':
-            self.activation = self.activation_linear
-            self.reverse_activation = self.reverse_activation_linear
+            if ActivationOffsetted:
+                self.activation = self.activation_linear_offset
+                self.reverse_activation = self.reverse_activation_linear_offset
+            else:
+                self.activation = self.activation_linear
+                self.reverse_activation = self.reverse_activation_linear
         elif activation == 'sigmoid':
             self.activation = self.activation_sigmoid
             self.reverse_activation = self.reverse_activation_sigmoid
@@ -66,7 +77,8 @@ class NNMOIRT:# {{{
             self.reverse_activation = self.reverse_activation_double_step
         else:
             raise ValueError(
-                    "The 'activation' key only accepts one of the three keys:\n"
+                    "The 'activation' key only accepts one of the three "
+                    "values:\n"
                     "'linear', 'sigmoid', 'double step'")
             self.activation = self.activation_linear
             self.reverse_activation = self.reverse_activation_linear
@@ -81,6 +93,14 @@ class NNMOIRT:# {{{
         return v
     def reverse_activation_linear(self, v):
         return (v - self.xi) / self.beta
+    # Eq. (23) with a small offset of ActivationMin:
+    def activation_linear_offset(self, u):
+        v = self.beta * u + self.xi + self.ActivationMin
+        v[v<self.ActivationMin] = self.ActivationMin
+        v[v>self.ActivationMax] = self.ActivationMax
+        return v
+    def reverse_activation_linear_offset(self, v):
+        return (v - self.xi - self.ActivationMin) / self.beta
     # Eq. (22)
     def activation_sigmoid(self, u):
         return 1 / ( 1 + np.exp(-self.beta * u) )

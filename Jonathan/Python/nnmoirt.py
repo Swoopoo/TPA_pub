@@ -76,11 +76,14 @@ class NNMOIRT:# {{{
         elif activation == 'double step':
             self.activation = self.activation_double_step
             self.reverse_activation = self.reverse_activation_double_step
+        elif activation == 'verbatim':
+            self.activation = self.activation_linear_verbatim
+            self.reverse_activation = self.reverse_activation_linear
         else:
             raise ValueError(
-                    "The 'activation' key only accepts one of the three "
+                    "The 'activation' key only accepts one of the four "
                     "values:\n"
-                    "'linear', 'sigmoid', 'double step'")
+                    "'linear', 'sigmoid', 'double step', 'verbatim'")
             self.activation = self.activation_linear
             self.reverse_activation = self.reverse_activation_linear
     # }}}
@@ -94,6 +97,11 @@ class NNMOIRT:# {{{
         return v
     def reverse_activation_linear(self, v):
         return (v - self.xi) / self.beta
+    def activation_linear_verbatim(self, u):
+        v = self.beta * u + self.xi
+        v[u<=-self.xi/self.beta] = self.ActivationMin
+        v[self.ActivationMax-self.xi/self.beta<=u] = self.ActivationMax
+        return v
     # Eq. (23) with a small offset of ActivationMin:
     def activation_linear_offset(self, u):
         v = self.beta * u + self.xi + self.ActivationMin
@@ -237,7 +245,8 @@ class NNMOIRT:# {{{
     # }}}
 
     # calc_G function {{{
-    def calc_G(self, C, InitZeros = True, MaxIterations = int(1e4), residuum = 1e-4):
+    def calc_G(self, C, InitZeros = True, MaxIterations = int(1e4),
+            residuum = 1e-4, ResiduumElementwise = True):
         # doc string {{{
         """ calc_G: Calculates the image vector G for the measurement C.
             Input data:
@@ -273,7 +282,15 @@ class NNMOIRT:# {{{
             self.gamma = self.calc_gamma(G, GSmoothed, C)
             u, GFuture = self.update_G(u, G, GSmoothed, C)
             tmp = GFuture - G
-            if np.dot(tmp, tmp) <= residuum: break
+            if ResiduumElementwise:
+                break_it = True
+                for t in tmp:
+                    if t**2 > residuum:
+                        break_it = False
+                        break
+                if break_it: break
+            else:
+                if np.dot(tmp, tmp) <= residuum: break
             GSmoothed = self.smooth_G(GFuture)
             self.omega = self.calc_omega(GFuture, GSmoothed, C)
             G = GFuture

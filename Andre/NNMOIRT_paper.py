@@ -239,10 +239,7 @@ S = importMatFile(SMatrixPfad)
 CMatrixPfad = '../Daten/3_Kreise.txt'
 C = importCMatrix(CMatrixPfad)
 
-Model = InitModel(C, S, ImageSize)
-ImageSolution = Model.calc_G(C)
-
-Image = np.reshape(ImageSolution, ImageSize)
-plot = plt.imshow(Image)
-print(ImageSolution)
-#G = np.dot(S.T, C)
+#Model = InitModel(C, S, ImageSize)
+#ImageSolution = Model.calc_G(C)
+#print(ImageSolution)
+G = np.dot(S.T, C)

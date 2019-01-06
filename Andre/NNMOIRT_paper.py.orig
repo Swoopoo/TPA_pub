@@ -15,9 +15,8 @@ from tpamodules.import_C_matrix import importCMatrix
 # -----------------------------------------------------
 #
 # STAND: 16.10.2018
-# TODO: Rest der Funktionen (23+) durchsehen ob passen
 #
-# Notizen: Die Normierung bei u' kommt daher: Neural Network Approach ... (eq. 13) <- TODO: DAS PAPER UNBEDINGT LESEN
+# Notizen: Die Normierung bei u' kommt daher: Neural Network Approach ... (eq. 13) <-
 # DIE INITIALISIEREN v(0) AUF 1/n mit n = Pixelzahl eines Bildes!
 #
 #
@@ -33,7 +32,7 @@ class InitModel:
         self.alpha_0 = alpha_0 # penalty Parameter
         self.beta = beta # Steepness gain factor - vertical slope and the horizontal spread of the sigmoid-shape function
         self.xi = xi # y-Axis intercept of the linear activation function
-        self.zeta = zeta # TODO: ??
+        self.zeta = zeta
         self.eta = eta
         self.gam = np.zeros(3) # Initialize Gamma_1,2,3 to zero
         self.u = np.reshape(np.zeros(ImageSize[0] * ImageSize[1]), [ImageSize[0] * ImageSize[1], 1]) # Init. of Network Input Vector
@@ -49,8 +48,6 @@ class InitModel:
     # Differential von u nach S. 2205 (31)
     # Ist self.gam hier wirklich das gleiche wie in den anderen Funktionen? Im
     # Text steht auf S. 2204 das gamma = gamma / C_0 substituiert wird.
-    # TODO: Gamma is normalized on the Reference Capacity, but C_0 = 1 so we'll leave it at that for now
-    # TODO: Problem: Log(G) geht nicht, da G auf zeros initialisiert wird!!!!
 
 
     # Find neighbours for the smoothie calculation (lule)
@@ -122,8 +119,6 @@ class InitModel:
         print('Calculate Gammas')
         gamsum = np.dot(self.G_1darray, np.log(self.G_1darray))
         self.gam[0] = 1 / gamsum
-        # TODO: HIER IST GLAUB ICH EIN SCHREIBFEHLER IM PAPER, ES MueSSTE MINUS C HEIssEN DA DIE DIMENSIONEN JA GARNICHT
-        # TODO: STIMMEN KoeNNEN!!!
         self.gam[1] = 1 / ((0.5 * np.linalg.norm(np.dot(self.S, self.G) - self.C))**2)
 
         self.gam[2] = 1 / ((0.5 * np.dot(self.G.T, self.smoothie(self.G)) + 0.5 * np.dot(self.G.T, self.G)))

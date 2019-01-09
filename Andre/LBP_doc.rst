@@ -12,7 +12,7 @@ Helper functions
         return var.get(list(var.keys())[-1])
 
 **Import Matlab struct into python**
-
+c_phantom
 .. code-block:: python
 
     def read_matlab_struct(path):

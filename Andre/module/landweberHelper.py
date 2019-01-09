@@ -2,6 +2,7 @@ import scipy.io as sio
 import pandas as pd
 import numpy as np
 
+
 def cap_norm(param_struct, c_min, c_max, c, norm_struct):
     """ Normalize the capacity values"""
     if param_struct.ind_norm == 1:
@@ -35,16 +36,18 @@ def cap_norm(param_struct, c_min, c_max, c, norm_struct):
 
 
 def read_matlab_struct(path):
-    # Speichert die Struct als Python Object
+    """Import matlab struct as python object"""
     return sio.loadmat(path, struct_as_record=False, squeeze_me=True)
 
 
 def read_matlab_var(path):
+    """Import matlab variables as numpy arrays"""
     var = sio.loadmat(path)
     return var.get(list(var.keys())[-1])
 
 
-def read_cap_file(path, param_struct):
+def read_cap_file(path):
+    """Import capacity data from .txt file"""
     data_array = np.array(pd.read_csv(path, header=None, decimal='.', delim_whitespace=True))
     indx = np.tril_indices(data_array.shape[0], -1)
     c_array = data_array[indx]

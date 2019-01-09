@@ -24,19 +24,19 @@ class PLW:
         if a_lw != False: self.a_lw = a_lw
         if animated != False: self.animated = animated
         g = np.dot(self.S.T, C_phantom)
-        N = g.shape[0]
+        # N = g.shape[0]
         # Z = np.zeros((1,self.nlist.shape[0]))
         if self.animated:
             for i in range(iterations):
                 g += self.a_lw * np.dot(self.S.T, C_phantom - np.dot(self.S, g))
-                g[np.where(g < 0)] = 0
-                g[np.where(g > 1)] = 1
+                g[g < 0] = 0
+                g[g > 1] = 1
                 self.update_animation(Z,g)
         else:
             for i in range(iterations):
                 g += self.a_lw * np.dot(self.S.T, C_phantom - np.dot(self.S, g))
-                g[np.where(g < 0)] = 0
-                g[np.where(g > 1)] = 1
+                g[g < 0] = 0
+                g[g > 1] = 1
         return g
 # def PLW(param, cmats, S, a_lw, iterations):
     # Input as in Matlab script for now:

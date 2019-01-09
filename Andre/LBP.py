@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from LBP_helper import *
 
 
@@ -68,3 +69,6 @@ iterations = 100
 
 # TODO: Woher c_phantom?
 solved = landweber(param, cap_min, cap_max, c_array, norm, s, lw_iter, iterations)
+solved_image = np.reshape(solved, (91,91))
+plt.imshow(np.log(solved_image))
+plt.show()

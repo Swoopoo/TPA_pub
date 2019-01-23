@@ -1,8 +1,7 @@
 ##!/bin/python3
 import numpy as np
 import matplotlib.pyplot as plt
-from tpamodules.import_S_matrix import importMatFile
-from tpamodules.import_C_matrix import importCMatrix
+import landweberHelper as lH
 
 # Based on the paper 'Neural network based multi-criterion
 # optimization image reconstruction
@@ -49,8 +48,8 @@ class InitModel:
     # Text steht auf S. 2204 das gamma = gamma / C_0 substituiert wird.
 
 
-    # Find neighbours for the smoothie calculation (lule)
     def get_neighbours(self, i):
+        """Find neighbours for the smoothie calculation (lule)"""
         E = []
         V = []
         i_row = i // self.G_width
@@ -74,26 +73,26 @@ class InitModel:
         return (E, V)
 
 
-    # Penalty Parameter alpha according to equation 29 (p.2204)
     def penaltyAlpha(self):
+        """Penalty Parameter alpha according to equation 29 (p.2204)"""
         return self.alpha_0 + self.zeta * np.exp(-1 * self.eta * self.t)
 
 
-    # Calculate z according to equation 28 (p.2204)
     def calcZ(self):
+        """Calculate z according to equation 28 (p.2204)"""
         z = np.dot(self.S, self.G) - self.C
         return z
 
 
-    # Calculate delta(z) according to equation 27 (p.2204)
     def calcDeltaZ(self):
+        """Calculate delta(z) according to equation 27 (p.2204)"""
         deltaz = self.penaltyAlpha() * self.calcZ()
         deltaz[self.calcZ() <= 0] = 0
         return deltaz
 
 
-    # Calculate matrixprodukt X*G
     def smoothie(self, G):
+        """Calculate matrixprodukt X*G"""
         XG = self.smoothing_weights[0] * G.copy()
         for i in range(XG.size):
             E, V = self.get_neighbours(i) # returns 2 lists of indices
@@ -102,8 +101,8 @@ class InitModel:
         return XG
 
 
-     # Calculate the derivative of u according to equation 31 (p.2205)
     def derivu(self):
+        """Calculate the derivative of u according to equation 31 (p.2205)"""
         u_deriv = -(self.u/self.tau) - (
                   self.w[0] * self.gam[0] * (1 + np.log(self.G))
                 + self.w[1] * self.gam[1] * np.dot(self.S.T, self.calcZ())
@@ -113,8 +112,8 @@ class InitModel:
         return u_deriv
 
 
-    # Calculate gamma values for the algorithm according to equations on page 2207
     def calcGamma(self):
+        """Calculate gamma values for the algorithm according to equations on page 2207"""
         print('Calculate Gammas')
         gamsum = np.dot(self.G_1darray, np.log(self.G_1darray))
         self.gam[0] = 1 / gamsum
@@ -123,36 +122,37 @@ class InitModel:
         self.gam[2] = 1 / ((0.5 * np.dot(self.G.T, self.smoothie(self.G)) + 0.5 * np.dot(self.G.T, self.G)))
 
 
-    # Calculate G and u at the next timestep according to equation
     def deltaU(self):
+        """Calculate G and u at the next timestep according to equation"""
         return self.u + self.derivu() * self.deltat
 
 
     def deltaG(self):
+        """Calculate change in image vector"""
         return self.activation(self.deltaU())
 
 
-    # Objectfunction f1 according to equation 14 (p. 2203)
     def func1(self, G):
+        """Objectfunction f1 according to equation 14 (p. 2203)"""
         G_1darray = np.reshape(G, G.shape[0])
         f1 = self.gam[0] * np.dot(G_1darray,np.log(G_1darray))
         return f1
 
 
-    # Objectfunction f2 according to equation 15 (p. 2203)
     def func2(self, G):
+        """Objectfunction f2 according to equation 15 (p. 2203)"""
         f2 = 0.5 * self.gam[1] * np.linalg.norm(np.dot(self.S, G) - self.C)
         return f2
 
 
-    # Objectfunction f3 according to equation 16 (p. 2203)
     def func3 (self, G):
+        """Objectfunction f3 according to equation 16 (p. 2203)"""
         f3 = 0.5 * self.gam[2] * (np.dot(G.T, self.smoothie(G)) + np.dot(G.T, G))
         return f3
 
 
-    # Calculate weights 1-3 according to p.2207
     def deltaWeights(self, n):
+        """Calculate weights 1-3 according to p.2207"""
         if n == 1:
             return self.func1(self.deltaG()) - self.func1(self.G)
         elif n == 2:
@@ -161,8 +161,8 @@ class InitModel:
             return self.func3(self.deltaG()) - self.func3(self.G)
 
 
-    # Update weights according to the updatestep given on p.2207
     def updateWeights(self):
+        """Update weights according to the updatestep given on p.2207"""
         print('Updating Weights')
         for i in range(3):
             weightsum = 0
@@ -171,46 +171,49 @@ class InitModel:
             self.w[i] = (self.deltaWeights(1) / self.deltaWeights(i+1))/weightsum
 
 
-    # Perform a step in the internal algorithm time
     def timestep(self):
+        """Perform a step in the internal algorithm time"""
         self.t += self.deltat
         self.u = self.deltaU()
         self.G = self.deltaG()
         print('Timestep')
 
 
-    # Calculate image vector according to equation 36
     def updateImage(self):
+        """Calculate image vector according to equation 36"""
         self.G = self.deltaG()
         print('Update Image')
 
 
-    # Initialize first Imagevector G
     def initializeG(self):
+        """Initialize first Imagevector G"""
         return self.activation(self.u)
 
 
     def activation(self, u):
-       v = self.beta * u + self.xi
-       v[u <= -self.xi/self.beta] = 0
-       v[u >= 1 - self.xi/self.beta] = 1
-       return v
+        """Activation function"""
+        beta = 1
+        xi = 1
+        v = beta * u + xi
+        v[u <= -xi/beta] = 0
+        v[u >= 1 - xi/beta] = 1
+        return v
 
 
-    # Run an updating step according to p.2207
     def updatingStep(self):
+        """Run an updating step according to p.2207"""
         self.calcGamma()
         self.updateWeights()
         self.updateImage()
 
 
-     # Calculate the mean square error of the image vector
     def calcError(self):
+        """Calculate the mean square error of the image vector"""
         return np.linalg.norm(self.deltaG() - self.G)**2
 
 
-    # Calculate the image vector G from the given capacity values C
     def calc_G(self, C):
+        """Calculate the image vector G from the given capacity values C"""
         self.C = C
         self.G = self.initializeG()
         self.G_1darray = np.reshape(self.G, (len(self.G)))
@@ -226,14 +229,17 @@ class InitModel:
 
 #if __name__ == '__main__':
 ImageSize = (91, 91)
-SMatrixPfad = '../Daten/S_matrix_quadratisch.mat'
-#SMatrixPfad = '../Daten/Smatrix_16elek.mat'
-S = importMatFile(SMatrixPfad)
 
-CMatrixPfad = '../Daten/3_Kreise.txt'
-C = importCMatrix(CMatrixPfad)
+phantomdir = 'mulkreis'
+phantompath = '/home/andre/Documents/Studium/Teamprojektarbeit/Matlab Toolbox/Matlab/' + phantomdir + '/c_phantom3.txt'
+datapath = '/home/andre/Documents/Studium/Teamprojektarbeit/Datenundshit/Daten_TPA_23012019/TPA_Daten_fixed.mat'
+import_struct = lH.read_matlab_struct(datapath)
+param = import_struct['param']
+S = import_struct['solu'].S_r
+C = lH.read_cap_file(phantompath, param)
 
-#Model = InitModel(C, S, ImageSize)
-#ImageSolution = Model.calc_G(C)
+
+Model = InitModel(C, S, ImageSize)
+ImageSolution = Model.calc_G(C)
 #print(ImageSolution)
-G = np.dot(S.T, C)
+#G = np.dot(S.T, C)

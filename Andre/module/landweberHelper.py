@@ -1,19 +1,37 @@
 import scipy.io as sio
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+
+def landweber(param_struct, c_m_min, c_m_max, c_measure, norm_struct, s_mat, a_lw, iter_i):
+    """Execute Landweber algorithm"""
+    c = cap_norm(param_struct, c_m_min, c_m_max, c_measure, norm_struct)
+    g = np.dot(s_mat.T, c)
+    if param_struct.anim == 1:
+        for ii in range(0, iter_i):
+            g = g + a_lw*np.dot(s_mat.T, (c - np.dot(s_mat,g)))
+            g[g < 0] = 0
+            g[g >= 1] = 1
+        plot_ect(g)
+    elif param_struct.anim == 0:
+        for ii in range(0, iter_i):
+            g = g + a_lw*np.dot(s_mat.T, (c - np.dot(s_mat,g)))
+            g[g < 0] = 0
+            g[g >= 1] = 1
+            print(ii)
+    return g
 
 
-def cap_norm(param_struct, c_min, c_max, c, norm_struct):
+def cap_norm(param_struct, c_min, c_max, c_measure, norm_struct):
     """ Normalize the capacity values"""
+    c = c_measure
     if param_struct.ind_norm == 1:
+        c_norm = np.zeros((param_struct.M, 1))
         if norm_struct == 's':
-            c_norm = np.zeros((param_struct.M, 1))
-            for ii in range(1, param_struct.M):
+            for ii in range(0, param_struct.M):
                 c_norm[ii] = (1/c[ii]-1/c_min[ii])/(1/c_max[ii]-1/c_min[ii])
         elif norm_struct == 'p':
-            c_norm = np.zeros((param_struct.M, 1))
-            for ii in range(1, param_struct.M):
-                c_norm[ii] = (c[ii]-c_min[ii])/(c_max[ii]-c_min[ii])
+            c_norm = np.divide((c_measure - c_min),(c_max - c_min))
         else:
             raise ValueError('Wrong Norm')
     elif param_struct.ind_norm == 2 and param_struct.shuffle == 2:
@@ -46,9 +64,19 @@ def read_matlab_var(path):
     return var.get(list(var.keys())[-1])
 
 
-def read_cap_file(path):
+def read_cap_file(path, param):
     """Import capacity data from .txt file"""
     data_array = np.array(pd.read_csv(path, header=None, decimal='.', delim_whitespace=True))
-    indx = np.tril_indices(data_array.shape[0], -1)
-    c_array = data_array[indx]
-    return np.reshape(c_array, [len(c_array), 1])
+    C = np.zeros((param.M, 1))
+    pp = 0
+    for ii in range(0, param.m-1):
+        for jj in range(ii+1, param.m):
+            C[pp] = data_array[ii, jj]
+            pp += 1
+    return C
+
+
+def plot_ect(S_mat):
+    fig = plt.figure()
+    pl1 = plt.imshow(np.reshape(S_mat, (91, 91)))
+    plt.show()

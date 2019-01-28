@@ -3,9 +3,9 @@ import landweberHelper as lH
 import matplotlib.pyplot as plt
 import os
 
-phantomdir = 'mulkreis'
+phantomdir = 'streifenx'
 datapath = '/home/andre/Documents/Studium/Teamprojektarbeit/Datenundshit/Daten_TPA_23012019/TPA_Daten_fixed.mat'
-phantompath = '/home/andre/Documents/Studium/Teamprojektarbeit/Matlab Toolbox/Matlab/' + phantomdir + '/c_phantom3.txt'
+phantompath = '/home/andre/Documents/Studium/Teamprojektarbeit/Matlab Toolbox/Matlab/' + phantomdir + '/c_phantom4.txt'
 minpath = '/home/andre/Documents/Studium/Teamprojektarbeit/Matlab Toolbox/Matlab/' + phantomdir + '/c_min_ij.txt'
 maxpath = '/home/andre/Documents/Studium/Teamprojektarbeit/Matlab Toolbox/Matlab/' + phantomdir + '/c_max_ij.txt'
 
@@ -21,7 +21,7 @@ import_phantom_min = lH.read_cap_file(minpath, param)
 import_phantom_max = lH.read_cap_file(maxpath, param)
 
 #solution = lH.landweber(param, cmats.C_m_min, cmats.C_m_max, cmats.C_phantom, param.norm, S, 5, 5000)
-solution = lH.landweber(param, import_phantom_min, import_phantom_max, import_phantom, param.norm, S, 5, 3000)
+solution = lH.landweber(param, import_phantom_min, import_phantom_max, import_phantom, param.norm, S, 5, 800)
 lH.plot_ect(solution)
 
 

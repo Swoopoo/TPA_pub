@@ -99,26 +99,31 @@ class InitModel:
         """Calculate gamma values for the algorithm according to equations on page 2207"""
         print('Calculate Gammas')
         # self.gam[0] = 1 /np.dot(self.G_1darray, np.log(self.G_1darray))
-        self.gam[0] = 1 /np.dot(np.ndarray.flatten(self.G), np.ndarray.flatten(np.log(self.G)))
-        self.gam[1] = 1 / ((0.5 * np.linalg.norm(np.dot(self.S, self.G) - self.C))**2)
-        self.gam[2] = 1 / ((0.5 * np.dot(self.G.T, self.smoothie(self.G)) + 0.5 * np.dot(self.G.T, self.G)))
+        # self.gam[0] = 1 /np.dot(np.ndarray.flatten(self.G), np.ndarray.flatten(np.log(self.G)))
+        self.gam[0] = 1 /self.flat_np_dot(self.G, np.log(self.G))
+        # self.gam[0] = 1 /np.dot(self.G.flatten(), np.log(self.G).flatten())
+        self.gam[1] = 2 / (np.linalg.norm(np.dot(self.S, self.G) - self.C)**2)
+        # self.gam[2] = 1 / ((0.5 * np.dot(self.G.T, self.smoothie(self.G)) + 0.5 * np.dot(self.G.T, self.G)))
+        self.gam[2] = 2 / (self.flat_np_dot(self.G, self.smoothie(self.G)) + self.flat_np_dot(self.G, self.G))
 
 
     def func1(self, G):
         """Objectfunction f1 according to equation 14 (p. 2203)"""
         # G_1darray = np.reshape(G, G.shape[0])
         # f1 = self.gam[0] * np.dot(G_1darray,np.log(G_1darray))
-        f1 = self.gam[0] * np.dot(np.ndarray.flatten(G),np.log(np.ndarray.flatten(G)))
+        # f1 = self.gam[0] * np.dot(np.ndarray.flatten(G),np.log(np.ndarray.flatten(G)))
+        f1 = self.gam[0] * self.flat_np_dot(G, np.log(G))
         return f1
 
     def func2(self, G):
         """Objectfunction f2 according to equation 15 (p. 2203)"""
-        f2 = 0.5 * self.gam[1] * np.linalg.norm(np.dot(self.S, G) - self.C)
+        f2 = 0.5 * self.gam[1] * (np.linalg.norm(np.dot(self.S, G) - self.C))**2
         return f2
 
     def func3 (self, G):
         """Objectfunction f3 according to equation 16 (p. 2203)"""
-        f3 = 0.5 * self.gam[2] * (np.dot(G.T, self.smoothie(G)) + np.dot(G.T, G))
+        # f3 = 0.5 * self.gam[2] * (np.dot(G.T, self.smoothie(G)) + np.dot(G.T, G))
+        f3 = 0.5 * self.gam[2] * (self.flat_np_dot(G, self.smoothie(G)) + self.flat_np_dot(G, G))
         return f3
 
     def deltaWeights(self, n):
@@ -133,10 +138,10 @@ class InitModel:
     def updateWeights(self):
         """Update weights according to the updatestep given on p.2207"""
         print('Updating Weights')
+        weightsum = 0
         for i in range(3):
-            weightsum = 0
-            for k in range(3):
-                weightsum += (self.deltaWeights(1) / self.deltaWeights(k+1))
+            weightsum += (self.deltaWeights(1) / self.deltaWeights(i+1))
+        for i in range(3):
             self.w[i] = (self.deltaWeights(1) / self.deltaWeights(i+1))/weightsum
 
     def timestep(self):
@@ -216,6 +221,9 @@ class InitModel:
         plt.imshow(np.reshape(self.deltaG(), (91, 91)))
         plt.colorbar()
         plt.show()
+    
+    def flat_np_dot(A,B):
+        return np.dot(np.ndarray.flatten(A),np.ndarray.flatten(B))
 
 
 # if __name__ == '__main__':

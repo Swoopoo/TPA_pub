@@ -238,6 +238,6 @@ import_phantom_max = lH.read_cap_file(maxpath, param)
 
 Model = InitModel(s_mat, pixels)
 ImageSolution = Model.calc_G(import_phantom, import_phantom_min, import_phantom_max, param, init=1)
-# Spratte mieft
+# NNMOIRT mieft
 # print(ImageSolution)
 # G = np.dot(S.T, C)

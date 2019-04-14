@@ -81,12 +81,13 @@ class InitModel:
 
     def calcDeltaZ(self):
         """Calculate delta(z) according to equation 27 (p.2204)"""
-        deltaz = self.penaltyAlpha() * self.calcZ()
-        deltaz[self.calcZ() <= 0] = 0
+        z = self.calcZ()
+        deltaz = self.penaltyAlpha() * z
+        deltaz[z <= 0] = 0
         return deltaz
 
     def smoothie(self, G):
-        """Calculate matrixprodukt X*G"""
+        """Calculate matrixproduct X*G"""
         XG = self.smoothing_weights[0] * G.copy()
         for i in range(XG.size):
             E, V = self.getNeighbours(i) # returns 2 lists of indices
@@ -94,25 +95,23 @@ class InitModel:
                      + self.smoothing_weights[2] * np.sum(G[V])
         return XG
 
-
     def calcGamma(self):
         """Calculate gamma values for the algorithm according to equations on page 2207"""
         print('Calculate Gammas')
         # self.gam[0] = 1 /np.dot(self.G_1darray, np.log(self.G_1darray))
         # self.gam[0] = 1 /np.dot(np.ndarray.flatten(self.G), np.ndarray.flatten(np.log(self.G)))
-        self.gam[0] = 1 /self.flat_np_dot(self.G, np.log(self.G))
+        self.gam[0] = 1 /self.flat_dot(self.G, np.log(self.G))
         # self.gam[0] = 1 /np.dot(self.G.flatten(), np.log(self.G).flatten())
         self.gam[1] = 2 / (np.linalg.norm(np.dot(self.S, self.G) - self.C)**2)
         # self.gam[2] = 1 / ((0.5 * np.dot(self.G.T, self.smoothie(self.G)) + 0.5 * np.dot(self.G.T, self.G)))
-        self.gam[2] = 2 / (self.flat_np_dot(self.G, self.smoothie(self.G)) + self.flat_np_dot(self.G, self.G))
-
+        self.gam[2] = 2 / (self.flat_dot(self.G, self.smoothie(self.G)) + self.flat_dot(self.G, self.G))
 
     def func1(self, G):
         """Objectfunction f1 according to equation 14 (p. 2203)"""
         # G_1darray = np.reshape(G, G.shape[0])
         # f1 = self.gam[0] * np.dot(G_1darray,np.log(G_1darray))
         # f1 = self.gam[0] * np.dot(np.ndarray.flatten(G),np.log(np.ndarray.flatten(G)))
-        f1 = self.gam[0] * self.flat_np_dot(G, np.log(G))
+        f1 = self.gam[0] * self.flat_dot(G, np.log(G))
         return f1
 
     def func2(self, G):
@@ -123,7 +122,7 @@ class InitModel:
     def func3 (self, G):
         """Objectfunction f3 according to equation 16 (p. 2203)"""
         # f3 = 0.5 * self.gam[2] * (np.dot(G.T, self.smoothie(G)) + np.dot(G.T, G))
-        f3 = 0.5 * self.gam[2] * (self.flat_np_dot(G, self.smoothie(G)) + self.flat_np_dot(G, G))
+        f3 = 0.5 * self.gam[2] * (self.flat_dot(G, self.smoothie(G)) + self.flat_dot(G, G))
         return f3
 
     def deltaWeights(self, n):
@@ -146,9 +145,16 @@ class InitModel:
 
     def timestep(self):
         """Perform a step in the internal algorithm time"""
+        # deltaG is dependent on the u of the current time step so must be done
+        # before u is updated
+        #self.G = self.deltaG()
+        #self.u = self.deltaU()
+        #self.t += self.deltat
+        # Perhaps a more readable or more transparent implementation, the usage
+        # of deltaG and deltaU in the above is too confusing.
+        self.u += self.derivu() * self.deltat
+        self.G  = self.activation(self.u)
         self.t += self.deltat
-        self.u = self.deltaU()
-        self.G = self.deltaG()
         print('Timestep')
 
     def deltaG(self):
@@ -192,6 +198,10 @@ class InitModel:
 
     def updatingStep(self):
         """Run an updating step according to p.2207"""
+        # TODO: This looks very wrong. Updating should be done in timestep,
+        # that's what it's for. Later both updatingStep and timestep are used in
+        # calc_G in each iteration. updatingStep calls updateImage which does a
+        # new calculation of G. Maybe I'm too tired to understand this...
         self.calcGamma()
         self.updateWeights()
         self.updateImage()
@@ -222,7 +232,7 @@ class InitModel:
         plt.colorbar()
         plt.show()
     
-    def flat_np_dot(A,B):
+    def flat_dot(A,B):
         return np.dot(np.ndarray.flatten(A),np.ndarray.flatten(B))
 
 

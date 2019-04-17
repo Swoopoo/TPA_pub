@@ -151,7 +151,10 @@ class InitModel:
         #self.u = self.deltaU()
         #self.t += self.deltat
         # Perhaps a more readable or more transparent implementation, the usage
-        # of deltaG and deltaU in the above is too confusing.
+        # of deltaG and deltaU in the above is too confusing. Also moved the
+        # calcGamma and updateWeights functions in here
+        self.calcGamma()
+        self.updateWeights()
         self.u += self.derivu() * self.deltat
         self.G  = self.activation(self.u)
         self.t += self.deltat
@@ -177,7 +180,7 @@ class InitModel:
 
     def updateImage(self):
         """Calculate image vector according to equation 36"""
-        self.G = self.deltaG()
+        #self.G = self.deltaG()
         print('Update Image')
         plt.imshow(np.reshape(self.G, (91, 91)))
         plt.savefig('/home/andre/Documents/Git/TPA_pub/Andre/testpics/'+str(self.t)+'.png')
@@ -215,8 +218,9 @@ class InitModel:
         self.C = C_phantom
         if init == 1:
             self.G = self.initializeG(C_min, C_max, param)
+            self.updateImage()
         # self.G_1darray = np.reshape(self.G, (len(self.G)))
-        self.updatingStep()
+        #self.updatingStep()
         Error = self.calcError()
         print(Error)
         if len(np.where(Error > 1e-4)[0]) == 0:
@@ -224,6 +228,7 @@ class InitModel:
             self.plotG()
         else:
             self.timestep()
+            self.updateImage()
             print('Iteration: ' +str(self.t*100))
             self.calc_G(C_phantom, C_min, C_max, param, init=0)
 

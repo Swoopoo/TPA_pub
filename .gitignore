@@ -7,4 +7,4 @@ __pycache__
 *.out
 *.synctex.gz
 tikzuebung.pdf
-/Andre/testpics/*.png
+Andre/testpics/*.png

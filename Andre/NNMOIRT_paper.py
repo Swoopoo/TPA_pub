@@ -237,7 +237,7 @@ class InitModel:
         plt.colorbar()
         plt.show()
     
-    def flat_dot(A,B):
+    def flat_dot(self,A,B):
         return np.dot(np.ndarray.flatten(A),np.ndarray.flatten(B))
 
 

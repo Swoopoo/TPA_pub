@@ -22,8 +22,8 @@ class NNMOIRT:# {{{
             S (NxM np.ndarray): Sensitiviy matrix with N the size of the
                 capacitance vectors and M the size of the image vector
             ImageSize (2x1 tuple): The size of the created image in HxW
-            alpha_0 (float): alpha_0 as in eq. (29)
-            zeta (float): zeta as in eq. (29)
+            alpha_0 (float): alpha_0 as in eq. (29) (alpha_0>0)
+            zeta (float): zeta as in eq. (29) (zeta>0)
             OmegaInitial (3x1 tuple): the initial values for omega_i
             activation (string): Choose the used activation function from:
                 'linear': activation according to eq. (23) corrected
@@ -39,7 +39,7 @@ class NNMOIRT:# {{{
                 vertix-neighbours.
             tau (float): time constant R_{0}C_{0} for eq. (31)
             deltaT (float): time step
-            eta (float): factor for eq. (29)
+            eta (float): factor for eq. (29) (eta>0)
             ActivationMin (float): you can force the values of the activation
                 functions to be in bounds, this is the lower bound
             ActivationMax (float): you can force the values of the activation
@@ -51,19 +51,19 @@ class NNMOIRT:# {{{
     # }}}
     # init function {{{
     def __init__ (self, S, ImageSize
-            ,alpha_0 = 7
-            ,zeta = 5
-            ,OmegaInitial = (1/3,1/3,1/3)
-            ,activation = 'linear'
-            ,beta = 2
-            ,xi = 0.1
-            ,SmoothingWeights = (1, -1/8, -1/8)
-            ,tau = 1
-            ,deltaT = 0.01
-            ,eta = 1
-            ,ActivationMin = 1e-50
-            ,ActivationMax = 1
-            ,ActivationOffsetted = False
+            ,alpha_0 = 7                        # according to paper
+            ,zeta = 5                           # according to paper
+            ,OmegaInitial = (1/3,1/3,1/3)       # according to paper
+            ,activation = 'linear'              # most reasonable
+            ,beta = 2                           # according to paper
+            ,xi = 0.1                           # arbitrary
+            ,SmoothingWeights = (1, -1/8, -1/8) # according to paper
+            ,tau = 1                            # according to paper
+            ,deltaT = 0.01                      # according to paper
+            ,eta = 1                            # arbitrary
+            ,ActivationMin = 1e-50              # arbitrary but reasonable
+            ,ActivationMax = 1                  # according to paper
+            ,ActivationOffsetted = False        # arbitrary
             ):
         self.S = S
         self.ImgWd = ImageSize[0]

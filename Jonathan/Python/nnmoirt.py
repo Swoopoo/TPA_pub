@@ -16,11 +16,44 @@ import numpy as np
 #   multiple words: under_scores
 
 class NNMOIRT:# {{{
+    # doc string {{{
+    """ Initialize an NNMOIRT model
+        Input data:
+            S (NxM np.ndarray): Sensitiviy matrix with N the size of the
+                capacitance vectors and M the size of the image vector
+            ImageSize (2x1 tuple): The size of the created image in HxW
+            alpha_0 (float): alpha_0 as in eq. (29)
+            zeta (float): zeta as in eq. (29)
+            OmegaInitial (3x1 tuple): the initial values for omega_i
+            activation (string): Choose the used activation function from:
+                'linear': activation according to eq. (23) corrected
+                'verbatim': activation according to eq. (23) uncorrected
+                'sigmoid': activation according to eq. (22)
+                'double step': activation according to eq. (37-39)
+            beta (float or 2x1 tuple): factor in the activation functions, tuple
+                only for activation='double step'
+            xi (float or 2x1 tuple): factor in the activation functions, tuple
+                only for activation='double step'
+            SmoothingWeights (3x1 tuple): The weights used to smooth the image
+                vector. 1st element is self, 2nd is for edge-neighbours, 3rd for
+                vertix-neighbours.
+            tau (float): time constant R_{0}C_{0} for eq. (31)
+            deltaT (float): time step
+            eta (float): factor for eq. (29)
+            ActivationMin (float): you can force the values of the activation
+                functions to be in bounds, this is the lower bound
+            ActivationMax (float): you can force the values of the activation
+                functions to be in bounds, this is the upper bound
+            ActivationOffsetted (Boolean): if True the whole activation will be
+                offsetted by ActivationMin. Only supported for
+                activation='linear'.
+    """    
+    # }}}
     # init function {{{
     def __init__ (self, S, ImageSize
             ,alpha_0 = 7
             ,zeta = 5
-            ,omega = (1/3,1/3,1/3)
+            ,OmegaInitial = (1/3,1/3,1/3)
             ,activation = 'linear'
             ,beta = 2
             ,xi = 0.1
@@ -45,7 +78,8 @@ class NNMOIRT:# {{{
         self.time = 0
         self.eta = eta
         self.zeta = zeta
-        self.omega = omega
+        self.OmegaInitial = OmegaInitial
+        self.omega = OmegaInitial
         if len(SmoothingWeights) != 3:
             raise ValueError("SmoothingWeights must be of length 3")
         self.SmoothingWeights = SmoothingWeights
@@ -86,6 +120,29 @@ class NNMOIRT:# {{{
                     "'linear', 'sigmoid', 'double step', 'verbatim'")
             self.activation = self.activation_linear
             self.reverse_activation = self.reverse_activation_linear
+        if activation == 'double step':
+            self._assert_subscriptable(beta,2,'beta')
+            self._assert_subscriptable(xi,2,'xi')
+        else:
+            self._assert_scalar(beta,'beta')
+            self._assert_scalar(xi,'xi')
+    # }}}
+
+    # assertions {{{
+    # assert something is subscriptable and one-dimensional {{{
+    def _assert_subscriptable(self,obj,size,name):
+        if np.size(obj) < size:
+            raise ValueError(
+                    "'%s' is not subscriptable or isn't big enough.\n"
+                    "Should be subscriptable and have size %d."%(name,size))
+        if len(np.shape(obj)) != 1:
+            raise ValueError("'%s' is not one-dimensional."%(name))
+    # }}}
+    # assert something is a scalar {{{
+    def _assert_scalar(self,obj,name):
+        if np.size(obj) != 1 or len(np.shape(obj)) != 0:
+            raise ValueError("'%s' is not a single number"%(name))
+    # }}}
     # }}}
 
     # activation functions {{{
@@ -128,6 +185,7 @@ class NNMOIRT:# {{{
 
     # calculate gamma_i {{{
     # Equations as in "2. Update step" on page 2206
+    # left out the factors 1/2 since they're cancelled down anyway in f_i
     def calc_gamma1(self, G):
         return 1 / ( np.dot(G, np.log(G)) )
     def calc_gamma2(self, G, C):
@@ -140,7 +198,7 @@ class NNMOIRT:# {{{
                 self.calc_gamma1(G),
                 self.calc_gamma2(G, C),
                 self.calc_gamma3(G, GSmoothed)
-                )
+               )
     # }}}
 
     # init u, v functions {{{
@@ -156,6 +214,7 @@ class NNMOIRT:# {{{
     # }}}
 
     # f_i functions {{{
+    # left out the factors 1/2 since they're cancelled down anyway with gamma_i
     # Eq. (14)
     def f1(self, G, GSmoothed, C):
         return self.gamma[0] * np.dot(G, np.log(G))
@@ -178,7 +237,10 @@ class NNMOIRT:# {{{
                 ]
         SumDeltaRel = 1 + \
                 DeltaOmega[0] * ( 1 / DeltaOmega[1] + 1 / DeltaOmega[2] )
-        return [ DeltaOmega[0] / SumDeltaRel / DeltaOmega[i] for i in range(3) ]
+        return [
+                ( 1 if i == 0 else DeltaOmega[0] / DeltaOmega[i] ) / SumDeltaRel
+                for i in range(3)
+               ]
     # }}}
 
     # function to smooth G returning the result of X*G {{{
@@ -246,7 +308,7 @@ class NNMOIRT:# {{{
 
     # calc_G function {{{
     def calc_G(self, C, InitZeros = True, MaxIterations = int(1e4),
-            residuum = 1e-4, ResiduumElementwise = True):
+            residuum = 1e-4, ResiduumElementwise = False):
         # doc string {{{
         """ calc_G: Calculates the image vector G for the measurement C.
             Input data:
@@ -277,20 +339,15 @@ class NNMOIRT:# {{{
             u, G = self.init_SC(C)
         GSmoothed = self.smooth_G(G)
         self.time = 0
+        self.omega = self.OmegaInitial
         for i in range(MaxIterations):
             print('Iteration', i)
             self.gamma = self.calc_gamma(G, GSmoothed, C)
             u, GFuture = self.update_G(u, G, GSmoothed, C)
-            tmp = GFuture - G
+            deltaG = GFuture - G
             if ResiduumElementwise:
-                break_it = True
-                for t in tmp:
-                    if t**2 > residuum:
-                        break_it = False
-                        break
-                if break_it: break
-            else:
-                if np.dot(tmp, tmp) <= residuum: break
+                if len(np.where(deltaG**2 > residuum)[0]) == 0: break
+            elif np.dot(deltaG, deltaG) <= residuum: break
             GSmoothed = self.smooth_G(GFuture)
             self.omega = self.calc_omega(GFuture, GSmoothed, C)
             G = GFuture

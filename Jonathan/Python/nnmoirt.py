@@ -145,6 +145,17 @@ class NNMOIRT:# {{{
     # }}}
     # }}}
 
+    # calculate the scalar product of x log(x) with 0 = 0 log(0) {{{
+    # problem is that in eq. (31) log(G) is used without being multiplied by 0,
+    # so activations < 0 are still an issue
+    def _dot_log(self,array):
+        idx = np.where(array>0)
+        tmp = np.copy(array)
+        tmp[tmp<0] = 0
+        tmp[idx]   = np.log(tmp[idx])
+        return np.dot(array,tmp)
+    # }}}
+
     # activation functions {{{
     # Eq. (23)
     def activation_linear(self, u):
@@ -187,7 +198,7 @@ class NNMOIRT:# {{{
     # Equations as in "2. Update step" on page 2206
     # left out the factors 1/2 since they're cancelled down anyway in f_i
     def calc_gamma1(self, G):
-        return 1 / ( np.dot(G, np.log(G)) )
+        return 1 / ( self._dot_log(G) )
     def calc_gamma2(self, G, C):
         tmp = np.dot(self.S, G) - C
         return 1 / ( np.dot(tmp,tmp) )
@@ -217,7 +228,10 @@ class NNMOIRT:# {{{
     # left out the factors 1/2 since they're cancelled down anyway with gamma_i
     # Eq. (14)
     def f1(self, G, GSmoothed, C):
-        return self.gamma[0] * np.dot(G, np.log(G))
+        print(self.gamma[0])
+        print(self._dot_log(G))
+        print(self.gamma[0] * self._dot_log(G))
+        return self.gamma[0] * self._dot_log(G)
     # Eq. (15)
     def f2(self, G, GSmoothed, C):
         tmp = np.dot(self.S, G) - C
@@ -235,6 +249,8 @@ class NNMOIRT:# {{{
         DeltaOmega = [
                 self.f[i](GFuture, GFutureSmoothed, C) - 1 for i in range(3)
                 ]
+        for i in range(3):
+            print('f%d: %f'%(i,DeltaOmega[i]+1))
         SumDeltaRel = 1 + \
                 DeltaOmega[0] * ( 1 / DeltaOmega[1] + 1 / DeltaOmega[2] )
         return [
@@ -343,6 +359,8 @@ class NNMOIRT:# {{{
         for i in range(MaxIterations):
             print('Iteration', i)
             self.gamma = self.calc_gamma(G, GSmoothed, C)
+            for i in range(3):
+                print('γ%d: %f'%(i,self.gamma[i]))
             u, GFuture = self.update_G(u, G, GSmoothed, C)
             deltaG = GFuture - G
             if ResiduumElementwise:
@@ -350,6 +368,8 @@ class NNMOIRT:# {{{
             elif np.dot(deltaG, deltaG) <= residuum: break
             GSmoothed = self.smooth_G(GFuture)
             self.omega = self.calc_omega(GFuture, GSmoothed, C)
+            for i in range(3):
+                print('ω%d: %f'%(i,self.omega[i]))
             G = GFuture
             self.time += self.deltaT
         if i == MaxIterations:

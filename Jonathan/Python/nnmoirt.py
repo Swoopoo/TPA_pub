@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 # Implementation of the NNMOIRT algorithm as described in
 #   Neural network based multi criterion optimization image reconstruction
@@ -34,6 +35,8 @@ class NNMOIRT:# {{{
                 only for activation='double step'
             xi (float or 2x1 tuple): factor in the activation functions, tuple
                 only for activation='double step'
+            rho (2x1 tuple): factor in activation function 'double step', sum
+                must be 1, rho[0] = (eps_M - eps_L) / (eps_H - eps_L)
             SmoothingWeights (3x1 tuple): The weights used to smooth the image
                 vector. 1st element is self, 2nd is for edge-neighbours, 3rd for
                 vertix-neighbours.
@@ -53,14 +56,15 @@ class NNMOIRT:# {{{
     def __init__ (self, S, ImageSize
             ,alpha_0 = 7                        # according to paper
             ,zeta = 5                           # according to paper
+            ,eta = 1                            # arbitrary
             ,OmegaInitial = (1/3,1/3,1/3)       # according to paper
             ,activation = 'linear'              # most reasonable
             ,beta = 2                           # according to paper
             ,xi = 0.1                           # arbitrary
+            ,rho = (0.5, 0.5)                   # arbitrary
             ,SmoothingWeights = (1, -1/8, -1/8) # according to paper
             ,tau = 1                            # according to paper
             ,deltaT = 0.01                      # according to paper
-            ,eta = 1                            # arbitrary
             ,ActivationMin = 1e-50              # arbitrary but reasonable
             ,ActivationMax = 1                  # according to paper
             ,ActivationOffsetted = False        # arbitrary
@@ -87,7 +91,10 @@ class NNMOIRT:# {{{
         self.deltaT = deltaT
         self.f = ( self.f1, self.f2, self.f3 )
         # for double step
-        self.rho = (1,1)
+        if sum(rho) != 1:
+            raise ValueError(
+                "Sum of rho[0] and rho[1] doesn't equal 1")
+        self.rho = rho
         self.ActivationMin = ActivationMin
         self.ActivationMax = ActivationMax
         self.ActivationOffsetted = ActivationOffsetted
@@ -128,6 +135,22 @@ class NNMOIRT:# {{{
             self._assert_scalar(xi,'xi')
     # }}}
 
+    # GReturn class {{{
+    class GReturn:
+        def __init__(self, img, iteration, residuum, height, width):
+            self.G = img
+            self.iteration = iteration
+            self.residuum  = residuum
+            self.height    = height
+            self.width     = width
+        def plot(self, **kwargs):
+            return plt.matshow(
+                    np.reshape(self.G, (self.width, self.height)),
+                    interpolation='none',
+                    **kwargs
+                    )
+    # }}}
+
     # assertions {{{
     # assert something is subscriptable and one-dimensional {{{
     def _assert_subscriptable(self,obj,size,name):
@@ -147,12 +170,11 @@ class NNMOIRT:# {{{
 
     # calculate the scalar product of x log(x) with 0 = 0 log(0) {{{
     # problem is that in eq. (31) log(G) is used without being multiplied by 0,
-    # so activations < 0 are still an issue
+    # so activations <= 0 are still an issue
     def _dot_log(self,array):
         idx = np.where(array>0)
-        tmp = np.copy(array)
-        tmp[tmp<0] = 0
-        tmp[idx]   = np.log(tmp[idx])
+        tmp = np.zeros(np.shape(array))
+        tmp[idx] = np.log(array[idx])
         return np.dot(array,tmp)
     # }}}
 
@@ -228,9 +250,9 @@ class NNMOIRT:# {{{
     # left out the factors 1/2 since they're cancelled down anyway with gamma_i
     # Eq. (14)
     def f1(self, G, GSmoothed, C):
-        print(self.gamma[0])
-        print(self._dot_log(G))
-        print(self.gamma[0] * self._dot_log(G))
+        # print(self.gamma[0])
+        # print(self._dot_log(G))
+        # print(self.gamma[0] * self._dot_log(G))
         return self.gamma[0] * self._dot_log(G)
     # Eq. (15)
     def f2(self, G, GSmoothed, C):
@@ -244,19 +266,15 @@ class NNMOIRT:# {{{
     # calculate omega_i {{{
     # Equations as in "2. Update step" on page 2206
     def calc_omega(self, GFuture, GFutureSmoothed, C):
-        # Since $\gamma_i != \frac{1}{f_i(G)|_{\gamma_i=1}}$ one can subsitute
+        # Since $\gamma_i == \frac{1}{f_i(G)|_{\gamma_i=1}}$ one can substitute
         # $f_i(G)$ with 1
         DeltaOmega = [
                 self.f[i](GFuture, GFutureSmoothed, C) - 1 for i in range(3)
                 ]
-        for i in range(3):
-            print('f%d: %f'%(i,DeltaOmega[i]+1))
-        SumDeltaRel = 1 + \
-                DeltaOmega[0] * ( 1 / DeltaOmega[1] + 1 / DeltaOmega[2] )
-        return [
-                ( 1 if i == 0 else DeltaOmega[0] / DeltaOmega[i] ) / SumDeltaRel
-                for i in range(3)
-               ]
+        # for i in range(3):
+            # print('f%d: %f'%(i,DeltaOmega[i]+1))
+        SumDeltaRel = 1/DeltaOmega[0] + 1/DeltaOmega[1] + 1/DeltaOmega[2]
+        return [ 1 / (DeltaOmega[i] * SumDeltaRel) for i in range(3) ]
     # }}}
 
     # function to smooth G returning the result of X*G {{{
@@ -322,9 +340,23 @@ class NNMOIRT:# {{{
         return (u, self.activation(u))
     # }}}
 
+    # save_iteration function {{{
+    def save_iteration(self, name, iteration, img):
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax.imshow(
+                np.reshape(img, (self.ImgWd, self.ImgHt)),
+                interpolation='none'
+                )
+        ax.set_title(r"$i = %d$"%(iteration))
+        fig.savefig(name%(iteration))
+        plt.close(fig)
+    # }}}
+
     # calc_G function {{{
     def calc_G(self, C, InitZeros = True, MaxIterations = int(1e4),
-            residuum = 1e-4, ResiduumElementwise = False):
+            residuum = 1e-4, ResiduumElementwise = False, SaveIterations = None
+            ):
         # doc string {{{
         """ calc_G: Calculates the image vector G for the measurement C.
             Input data:
@@ -349,6 +381,8 @@ class NNMOIRT:# {{{
         else: ValueErrorFlag = True
         if ValueErrorFlag:
             raise ValueError('C has wrong dimensions.')
+        if SaveIterations != None:
+            plt.ioff() # turn off interactive plot mode
         if InitZeros:
             u, G = self.init_zeros()
         else:
@@ -359,23 +393,29 @@ class NNMOIRT:# {{{
         for i in range(MaxIterations):
             print('Iteration', i)
             self.gamma = self.calc_gamma(G, GSmoothed, C)
-            for i in range(3):
-                print('γ%d: %f'%(i,self.gamma[i]))
+            # for i in range(3):
+                # print('γ%d: %f'%(i,self.gamma[i]))
             u, GFuture = self.update_G(u, G, GSmoothed, C)
             deltaG = GFuture - G
+            if SaveIterations != None:
+                self.save_iteration(SaveIterations, i, GFuture)
             if ResiduumElementwise:
                 if len(np.where(deltaG**2 > residuum)[0]) == 0: break
             elif np.dot(deltaG, deltaG) <= residuum: break
             GSmoothed = self.smooth_G(GFuture)
             self.omega = self.calc_omega(GFuture, GSmoothed, C)
-            for i in range(3):
-                print('ω%d: %f'%(i,self.omega[i]))
+            # for i in range(3):
+                # print('ω%d: %f'%(i,self.omega[i]))
             G = GFuture
             self.time += self.deltaT
         if i == MaxIterations:
             print('Stopped after %d iterations!'%(MaxIterations))
         if self.ActivationOffsetted: GFuture -= self.ActivationMin
-        return GFuture
+        if ResiduumElementwise:
+            residuum = np.max(deltaG**2)
+        else:
+            residuum = np.dot(deltaG, deltaG)
+        return self.GReturn(GFuture, i, residuum, self.ImgHt, self.ImgWd)
     # }}}
 # }}}
 
